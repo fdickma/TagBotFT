@@ -64,7 +64,7 @@ def get_ngrams_df(df):
     # Adding Tag column from original data as first column
     df_ngrams.insert(0, "Tag", df["Tag"], True)
     
-    # Generate a dataframe with only the Tag an an Ngram column
+    # Generate a dataframe with only the Tag and Ngram column
     not_list_cols = [col for col in df_ngrams.columns if col not in ['Tag']] 
     for num_col in not_list_cols:
         df_tmp = df_ngrams[['Tag', num_col]]
@@ -307,9 +307,10 @@ def get_text_df(df):
 
     # Split dataframe in a new dataframe with ngrams
     ngrams_raw_df = get_ngrams_df(df)
+    ngrams_count = ngrams_raw_df.groupby(['Ngram', 'ngramTag'], as_index=False).size()
 
-    ngrams = ngrams_raw_df.groupby(['Ngram']).filter(lambda x : len(x)<2)
-    non_ngrams = ngrams_raw_df.groupby(['Ngram']).filter(lambda x : len(x)>1)
+    ngrams = ngrams_count.groupby(['Ngram']).filter(lambda x : len(x)<2)
+    non_ngrams = ngrams_count.groupby(['Ngram']).filter(lambda x : len(x)>1)
 
     print(f'Total usable: {len(ngrams.index)}')
     write_rel_text_db(ngrams)
