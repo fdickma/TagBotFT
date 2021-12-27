@@ -7,11 +7,32 @@ import numpy as np
 
 import tagbotft_lib as tl
 
+# Dickmann / Birkenkamp
+# Function to convert a string with numbers in it to a float.
+# SAP reports have the minus at the end and put a lot of 
+# spaces in it and have a "," instead of a "." as the decimal point.
+# In the amount, delete points and trailing whitespace, substitute
+# commas by points, and put a possible trailing minus sign at its
+# beginning.
+def convertAmount(amount: str) -> float:
+    temp = amount.strip().replace('.', '').replace(',', '.')
+    return float(temp) if temp[-1] != '-' else \
+    float('-' + temp[:-1])
+
+# Filter input dataframe by a filter dataframe
+def filter_input(in_df, filter_df):
+    # Iterate over all columns in the filter dataframe / exclude list
+    for col in filter_df:
+        newData = in_df[~in_df[[col]]\
+        .isin(filter_df[col].astype(str).tolist()).any(axis=1)]
+    return newData
+
 # Read input data from excel file and a defined worksheet
 def read_xl_learn(learn_file, wsheet, max_rows, max_cols, tag_col, text_col):
     from openpyxl import load_workbook
+
     # Loading data file with a maximum number of lines
-    print("Reading Excel sheet")
+    tl.message("Reading Excel data sheet")
     wb = load_workbook(learn_file, data_only=True, read_only=True)
     sheet = wb[wsheet]
     
@@ -66,8 +87,10 @@ def writeLog(logEvent):
 # Dickmann / Birkenkamp
 # Read SAP data files with RegEx to identify relevant data lines and items
 # Input files can come from Kosten, GWGs oder Anlagen
-def read_SAP_1(files: str, \
-               test_len: int, test: bool) -> list:
+def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
+
+    tl.message("Loading SAP data files...")
+
     # Extract unclassified data from possibly several files, ignoring
     # data rows with cost centres contained in a list of cost centres to
     # be excluded.
@@ -157,7 +180,7 @@ def read_SAP_1(files: str, \
                             (mc.group(6).strip() + ' ' + \
                              mc.group(7).strip()).upper(),       # Text.
                             mc.group(3).strip(),
-                            tl.convertAmount(mc.group(5)),        # Amount.
+                            convertAmount(mc.group(5)),        # Amount.
                             mc.group(4),                          # Date.
                             mc.group(1).strip(),                  # Year.
                             '', '',
@@ -175,7 +198,7 @@ def read_SAP_1(files: str, \
                             cost_cntr.strip(), '',  
                             ma.group(4).strip().upper().strip(),
                             '',
-                            tl.convertAmount(ma.group(5)),        # Amount.
+                            convertAmount(ma.group(5)),        # Amount.
                             mc.group(2),                          # Date.
                             ma.group(3).strip(),                  # Year.
                             '', '',
@@ -193,7 +216,7 @@ def read_SAP_1(files: str, \
                             cost_cntr.strip(), '',
                             ma.group(5).strip().upper().strip(),
                             '',
-                            tl.convertAmount(ma.group(6)),        # Amount.
+                            convertAmount(ma.group(6)),        # Amount.
                             ma.group(3),                          # Date.
                             ma.group(4).strip(),                  # Year.
                             '', '',
@@ -211,7 +234,7 @@ def read_SAP_1(files: str, \
                             cost_cntr.strip(), '',
                             ma.group(5).strip().upper().strip(),
                             '',
-                            tl.convertAmount(ma.group(4)),        # Amount.
+                            convertAmount(ma.group(4)),        # Amount.
                             ma.group(2),                          # Date.
                             ma.group(3).strip(),                  # Year.
                             '', '',
@@ -234,53 +257,10 @@ def read_SAP_1(files: str, \
     
     df['Datum'] = pd.to_datetime(df['Datum'], format='%d.%m.%Y')
 
-    return df
+    # Filtering the the SAP data by the exclude data
+    newData = filter_input(df, exclude_df)
 
-# Writing the results to an Excel file
-def writeXLS(filename_w, results):
-    from openpyxl import Workbook
-
-    wb = Workbook()
-    sheet = wb.active
-    
-    # Add header line
-    sheet['A1'].value = 'Art'
-    sheet['B1'].value = 'Kostenstelle'
-    sheet['C1'].value = 'System'
-    sheet['D1'].value = 'Beschreibung'
-    sheet['E1'].value = 'Kostenart'
-    sheet['F1'].value = 'Betrag'
-    sheet['G1'].value = 'Datum'
-    sheet['H1'].value = 'Jahr'
-    sheet['I1'].value = 'Referenz'
-     
-    # Copy data from variable to Sheet
-    i = 2
-    for wd in results:
-        sheet['A' + str(i)].value = wd[3]
-        sheet['B' + str(i)].value = wd[4]
-        sheet['C' + str(i)].value = ''
-        sheet['D' + str(i)].value = wd[2]
-        sheet['E' + str(i)].value = wd[5]
-        sheet['F' + str(i)].value = wd[7]
-        sheet['G' + str(i)].value = wd[8]
-        sheet['H' + str(i)].value = wd[9]
-        sheet['I' + str(i)].value = wd[12]
-        i += 1
-        
-    # Add Autofilter
-    sheet.auto_filter.ref = "A1:H1" + str(i)
-    
-    # Fixate the top row
-    c = sheet['A2']
-    sheet.freeze_panes = c
-
-    # Define column width
-    sheet.column_dimensions['D'].width = 25
-    
-    # Don't forget to save the file
-    wb.save(filename = filename_w)
-    return None
+    return newData
 
 # Coloring a set of cells in a row
 def color_row(sheet, cell_range, color):
@@ -301,7 +281,6 @@ def writeXLS(filename_w, results, tag_col, text_col):
     from openpyxl import Workbook
     from openpyxl.utils import get_column_letter
     from openpyxl.styles import NamedStyle
-
 
     wb = Workbook()
     sheet = wb.active
@@ -357,7 +336,7 @@ def writeXLS(filename_w, results, tag_col, text_col):
 
 # Read the excludes file into dataframe 
 def readExclude(filename):
-    print("Reading Kostenstellen exclude list")
+    tl.message("Reading Kostenstellen exclude list")
     try:
         df = pd.read_csv(filename, delimiter=' ')
     except FileNotFoundError:

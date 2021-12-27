@@ -12,7 +12,8 @@ from itertools import repeat
 from functools import partial
 from difflib import SequenceMatcher
 
-import tagbotft_file_lib as tf
+import tagbotft_lib_file as tf
+import tagbotft_lib_db as td
 
 def message(msg_text):
     print()
@@ -21,18 +22,6 @@ def message(msg_text):
     print("--------------------------------------")
     return
     
-# Dickmann / Birkenkamp
-# Function to convert a string with numbers in it to a float.
-# SAP reports have the minus at the end and put a lot of 
-# spaces in it and have a "," instead of a "." as the decimal point.
-# In the amount, delete points and trailing whitespace, substitute
-# commas by points, and put a possible trailing minus sign at its
-# beginning.
-def convertAmount(amount: str) -> float:
-    temp = amount.strip().replace('.', '').replace(',', '.')
-    return float(temp) if temp[-1] != '-' else \
-    float('-' + temp[:-1])
-
 # Convert input array to dataframe and assign "relevant"/"non_relevant" as tag
 def get_df(df, non_relevant):
     
@@ -200,28 +189,6 @@ def filter_df(unique_tags, max_lines, proc_num):
         
     return usable_lines
 
-def remove_dupl(usable_lines): 
-    # Delete all duplicate Ngrams 
-    usable_lines.drop_duplicates(subset=["Ngram"], keep='first', inplace=True)
-    return usable_lines[["Ngram", "ngramTag"]]    
-
-# Write the text Ngrams to an SQLite database
-def write_rel_text_db(ngrams):
-    # Store Ngrams and corresponding Tags in SQLite Database
-    conn = sqlite3.connect('Ngrams.sqlite')
-    ngrams.to_sql('relNgrams_Text', conn, if_exists='replace', index=False)
-    # Verifying data
-    pd.read_sql('select * from relNgrams_Text', conn)
-
-# Write the other columns to an SQLite database
-def write_other_db(other_df_set):
-    # Open database connection
-    conn = sqlite3.connect('Ngrams.sqlite')
-    for o in other_df_set:
-        df = o[1].drop(o[1].columns.difference(['Tag', o[0]]), axis=1)
-        df.to_sql('relNgrams_Col_'+o[0], conn, if_exists='replace', \
-                index=False)
-
 # Return columns where more than 10% of the entries are unique
 def get_uni_cols(df):
     col_list = []
@@ -298,7 +265,7 @@ def get_other_df(df):
     # Returning list with column and dataframe with tags and ID column
     # including size (the number of occurences per ID item)
     # But before returning the data will be saved in the database
-    write_other_db(other_df_set)
+    td.write_other_db(other_df_set)
     return other_df_set
 
 def get_text_df(df):
@@ -313,7 +280,7 @@ def get_text_df(df):
     non_ngrams = ngrams_count.groupby(['Ngram']).filter(lambda x : len(x)>1)
 
     print(f'Total usable: {len(ngrams.index)}')
-    write_rel_text_db(ngrams)
+    td.write_rel_text_db(ngrams)
 
     return ngrams, non_ngrams
 
@@ -394,10 +361,11 @@ def tag_non_relevant(input_df):
                 allerrors += 1
 
     print()
-    print('Tagged data: ' + str(counter))
     print('New Ngram data: ' + str(allerrors))
     tagged = input_df[(input_df['Tag'] == 'y')]
     untagged = input_df[(input_df['Tag'] == '')]
+    print('Tagged data: ' + str(len(tagged)))
+    print('Untagged data: ' + str(len(untagged)))
 
     #print(tagged)    
     return tagged, untagged
@@ -457,7 +425,7 @@ def get_existing_proc(in_df, learn_df):
             else:
                 comparisons.append(learn_df_copy[head] == b[head])
 
-        # Check if all conditions are met
+        # Check if all conditions are met by applying numpy.logical
         test = learn_df_copy.loc[np.logical_and.reduce(comparisons)]
 
         if len(test) > 0:
@@ -574,14 +542,6 @@ def count_tags_df(df_ngrams, max_lines):
             break
     return df_ngram_all
 
-# Write the text Ngrams to an SQLite database
-def write_text_db(ngrams):
-    # Store Ngrams and corresponding Tags in SQLite Database
-    conn = sqlite3.connect('Ngrams.sqlite')
-    ngrams.to_sql('genNgrams_Text', conn, if_exists='replace', index=False)
-    # Verifying data
-    pd.read_sql('select * from genNgrams_Text', conn)
-
 def get_tags_df(df, non_ngrams):
 
     message("Identifying tag column Ngrams")
@@ -607,7 +567,7 @@ def get_tags_df(df, non_ngrams):
         .isin(non_ngrams.Ngram.tolist()).any(axis=1)]
 
     print(f'Total usable: {len(ngrams.index)}')
-    write_text_db(ngrams)
+    td.write_text_db(ngrams)
 
     return ngrams, non_ngrams
 
@@ -690,14 +650,98 @@ def tag_relevant(input_df):
                 allerrors += 1
 
     print()
-    print('Tagged data: ' + str(counter))
     print('New Ngram data: ' + str(allerrors))
     tagged = input_df[(input_df['Tag'] != '')]
     untagged = input_df[(input_df['Tag'] == '')]
+    print('Tagged data: ' + str(len(tagged)))
+    print('Untagged data: ' + str(len(untagged)))
     pd.reset_option('mode.chained_assignment')
     return tagged, untagged
 
-# Find similar entries in a given dataframe
+# Assign the relevant input data based on distinct Ngrams
+def tag_other(input_df):
+
+    pd.set_option('mode.chained_assignment', None)
+
+    message('Tagging other columns data')
+    
+    # Loading Ngrams and corresponding Tags from SQLite Database
+    tables = []
+    conn = sqlite3.connect('Ngrams.sqlite')
+    tmp_tab = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table";', conn)
+    for tab in tmp_tab['name']:
+        if '_Col_' in tab:
+            try:
+                tables.append(tab)
+            except:
+                tables = tab
+
+    for t in tables:
+
+        col_name = t.replace("relNgrams_Col_","")
+        ngram_df = pd.read_sql('select * from ' + t, conn)
+    
+        counter = 0
+        progress_old = 0
+        p = 0
+        length = len(input_df.index)
+        existing_start = time.time()
+    
+        # Iterate the Ngrams
+        for a, b in input_df[col_name].to_frame().iterrows():
+            n = 0
+            result = None
+            error = False
+            
+            # The Ngrams are in b
+            for m in b:
+                
+                # If the input is not empty
+                if m is not None:
+                    # Check if the Input is a non relevant distinct Ngram
+                    test = ngram_df.loc[ngram_df[col_name] == m]
+                    
+                    # It is non relevant if the Ngram is found at all
+                    if len(test) > 0:
+                        result = test['Tag'].item()
+    
+            p += 1
+            # Time difference from start of process to now
+            timediff = datetime.timedelta(seconds=round(time.time() \
+                                                        - existing_start))
+
+            # Calculate the remaining seconds for tagging to finish
+            timeremain = datetime.timedelta(\
+                                            seconds=round(((time.time() - \
+                                            existing_start) / p) \
+                                            * (length - p)))
+
+            progress = round(p/length*100)
+            if progress > progress_old:
+                progress_old = progress
+                print('\rFilter progress: ' + str(progress) + str(' % ') 
+                + '  |  time: ' + str(timediff) + ' elapsed, ' + str(timeremain)
+                + ' remaining                  ', end="")
+
+            # If there is a result
+            if result is not None:
+                # Check if no error has been detected and then assign the Tag
+                # and an Edit column indicator
+                if result == "not_relevant":
+                    input_df.loc[a, "Tag"] = "y"
+                    input_df.loc[a, "Edit"] = ""
+                    input_df.loc[a, "Quality"] = 1
+                    counter += 1
+
+    print()
+    tagged = input_df[(input_df['Tag'] != '')]
+    untagged = input_df[(input_df['Tag'] == '')]
+    print('Tagged data: ' + str(len(tagged)))
+    print('Untagged data: ' + str(len(untagged)))
+    pd.reset_option('mode.chained_assignment')
+    return tagged, untagged
+
+# Find similar entries in a given dataframe with Levenshtein distance
 def find_similar(w, df):
     w = w.upper()
     quality = 0.0
@@ -711,13 +755,14 @@ def find_similar(w, df):
         quality = float(format(s, '0.02f'))
     return result, quality
 
-# Main function to assign tags to input data by applying Levenshtein distance
+# Assign tags to input data by applying Levenshtein distance
 def lev_tagging(in_df, learn_df, proc_num):
     progress_old = 0
     p = 0
     length = len(in_df.index)
     existing_start = time.time()
     for a, b in in_df.iterrows():
+        # Call the Levenshtein distance calculation function
         result, quality = find_similar(b.Text, learn_df)
         in_df.loc[a, 'Tag'] = result
         in_df.loc[a, 'Quality'] = quality
@@ -742,9 +787,10 @@ def lev_tagging(in_df, learn_df, proc_num):
               + ' remaining                  ', end="", flush=True)
     return in_df
 
+# Main tagging function with Levenshtein distance
 def tag_lev_df(in_df, learn_df, cores, max_lines):
 
-    message('Tagging similar data')
+    message('Tagging similar data with Levenshtein distance')
     
     # Building test data, the data to tagged
     # One process gets all data
@@ -778,9 +824,3 @@ def tag_lev_df(in_df, learn_df, cores, max_lines):
                 found_df = q
     print()
     return found_df
-
-def filter_input(in_df, filter_df):
-    for col in filter_df:
-        newData = in_df[~in_df[[col]]\
-        .isin(filter_df[col].astype(str).tolist()).any(axis=1)]
-    return newData
