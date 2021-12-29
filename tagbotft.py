@@ -34,6 +34,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '-l', '--logfile', help='Log console to file', action='store_true')
     parser.add_argument(
+        '-m', '--maxcol', help='Use maximum length in a columns', action='store_true')
+    parser.add_argument(
         '-n', '--newlearn', help='Process learning data', action='store_true')
     args = parser.parse_args()
     
@@ -70,6 +72,7 @@ if __name__ == '__main__':
 
     # Setting initial parameters
     org_data = []
+    dbf = "tagbotft.sqlite"
     org_file = 'learn_data.xlsx'
     wsheet = "Komplett"
     non_relevant = "y"
@@ -87,6 +90,9 @@ if __name__ == '__main__':
     work_data = tf.read_xl_learn(org_file, wsheet, max_lines, max_cols, \
                             tag_col_txt, text_col_txt)
 
+    if args.maxcol == True:
+        newData = tl.maxcol(newData, work_data)
+
     # Generate a dataframe from working data
     learn_df = tl.get_df(work_data, non_relevant)
 
@@ -96,10 +102,13 @@ if __name__ == '__main__':
         text_df, non_text_df = tl.get_text_df(learn_df)
 
         # Generate Ngrams for relevant/non-relevant from other columns
-        other_df = tl.get_other_df(learn_df)
+        other_df, other_cols = tl.get_other_df(learn_df)
 
         # Generate Ngrams for learned tags from text column
         tags_df, non_tags_df = tl.get_tags_df(work_data, non_text_df)
+
+        # Analyze relationship between important columns and tags
+        tl.tag_to_other(other_cols, work_data, newData)
 
     # Divide the new data into existing and new entries
     # Only new entries will be further processed 
@@ -126,7 +135,6 @@ if __name__ == '__main__':
     tagged = tagged.append(tagged_similar)
 
     print('Tagged data: ' + str(len(tagged)))
-    print('Untagged data: ' + str(len(untagged)))
 
     # Writing tagging results to Excel file
     tf.writeXLS('result_data.xlsx', tagged, tag_col_txt, text_col_txt)
