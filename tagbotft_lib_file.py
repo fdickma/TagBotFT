@@ -183,7 +183,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
                             convertAmount(mc.group(5)),        # Amount.
                             mc.group(4),                          # Date.
                             mc.group(1).strip(),                  # Year.
-                            '', '',
+                            'b', None,
                             mc.group(8).strip()))                 # Ref. num.
                         rownum += 1
                         lineCounter += 1
@@ -201,7 +201,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
                             convertAmount(ma.group(5)),        # Amount.
                             mc.group(2),                          # Date.
                             ma.group(3).strip(),                  # Year.
-                            '', '',
+                            'b', None,
                             ma.group(2).strip()))                 # Anl. num.
                         rownum += 1
                         lineCounter += 1
@@ -219,7 +219,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
                             convertAmount(ma.group(6)),        # Amount.
                             ma.group(3),                          # Date.
                             ma.group(4).strip(),                  # Year.
-                            '', '',
+                            'b', None,
                             ma.group(1).strip()))                 # Ref. num.
                         rownum += 1
                         lineCounter += 1
@@ -237,7 +237,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
                             convertAmount(ma.group(4)),        # Amount.
                             ma.group(2),                          # Date.
                             ma.group(3).strip(),                  # Year.
-                            '', '',
+                            'b', None,
                             ma.group(8).strip()))                 # Ref. num.
                         rownum += 1
                         lineCounter += 1
@@ -281,10 +281,11 @@ def writeXLS(filename_w, results, tag_col, text_col):
     from openpyxl import Workbook
     from openpyxl.utils import get_column_letter
     from openpyxl.styles import NamedStyle
+    from openpyxl.styles import Font, Fill
 
     wb = Workbook()
     sheet = wb.active
-
+    
     a = 1            
     for col_name in results.columns:
         if results[col_name].dtype == 'datetime64[ns]':
@@ -296,6 +297,7 @@ def writeXLS(filename_w, results, tag_col, text_col):
             col_name = text_col
             sheet.column_dimensions[get_column_letter(a)].width = 60
         sheet.cell(row=1, column=a).value = col_name
+        sheet.cell(row=1, column=a).font = Font(name='Calibri', size=10)
         a += 1
 
     # Start in row 2 after the header row
@@ -308,6 +310,7 @@ def writeXLS(filename_w, results, tag_col, text_col):
             if type(cell_value) == pd._libs.tslibs.timestamps.Timestamp:
                 cell_value = cell_value.date()
             sheet.cell(row=i, column=a).value = cell_value
+            sheet.cell(row=i, column=a).font = Font(name='Calibri', size=10)
             a += 1
 
         if i > 1 and type(sheet['M'+str(i)].value) == float:

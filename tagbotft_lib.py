@@ -17,15 +17,15 @@ import tagbotft_lib_db as td
 
 def message(msg_text):
     print()
-    print("--------------------------------------")
+    print("-------------------------------------------------------")
     print(msg_text+"...")
-    print("--------------------------------------")
+    print("-------------------------------------------------------")
     return
     
 # Convert input array to dataframe and assign "relevant"/"non_relevant" as tag
 def get_df(df, non_relevant):
     
-    print('Preparing Dataframe for Ngrams')
+    message('Preparing Dataframe for Ngrams')
         
     # First get rid of all empty Text rows; no input means nothing to work on
     df = df[df['Text'].notna()]
@@ -191,7 +191,8 @@ def filter_df(unique_tags, max_lines, proc_num):
 
 # Return columns where more than 10% of the entries are unique
 def get_uni_cols(df):
-    col_list = []
+    uni_col_list = []
+    other_col_list = []
     # Iterate over all columns
     for col in df:
         # Skip the standard columns for text and tag
@@ -199,12 +200,16 @@ def get_uni_cols(df):
             continue
         # Calculate the degree of uniqueness based on the number of entries
         uni_degree = len(df[col].unique())/len(df.index)*100
+        col_check = len(df[col])/len(df.index)*100
         # Only consider the column as relevant when degree over 10 percent
         if uni_degree > 10:
-            col_list.append(col)
+            uni_col_list.append(col)
             print(col + ":", uni_degree)
+        elif col_check > 99:
+            other_col_list.append(col)
+            print(col + ":", col_check, '(other column)')
     print()
-    return col_list
+    return uni_col_list, other_col_list
 
 # Return unique identifiers for tags in a given column
 def get_col_tags(df, col):
@@ -255,8 +260,8 @@ def get_other_df(df):
 
     message("Identifying other columns Ngrams")
 
-    # First get all relevant columns
-    uni_cols = get_uni_cols(df)
+    # First get all relevant columns and important colums
+    uni_cols, other_cols = get_uni_cols(df)
     other_df_set = []
     for c in uni_cols:
         print("Adding column:", c)
@@ -266,7 +271,7 @@ def get_other_df(df):
     # including size (the number of occurences per ID item)
     # But before returning the data will be saved in the database
     td.write_other_db(other_df_set)
-    return other_df_set
+    return other_df_set, other_cols
 
 def get_text_df(df):
 
@@ -407,6 +412,8 @@ def get_existing_proc(in_df, learn_df):
             except:
                 comp_cols = ncol
 
+    exclude_cols = td.read_other_cols_db()
+
     for a, b in in_df_copy.iterrows():
         # Define empty conditions list
         comparisons = []
@@ -414,10 +421,12 @@ def get_existing_proc(in_df, learn_df):
         for head in comp_cols:
             if head == "Tag":
                 continue
+            if head in exclude_cols:
+                continue
             # If not a tag column add the comparison to conditions list
             # In case of string comparison apply uppercase on the dataframe
             # and the comparing string
-            col_type = learn_df_copy[head].dtypes
+            col_type = learn_df_copy[head].dtype
             if col_type == np.object:
                 check = b[head].upper()
                 comparisons.append(learn_df_copy[head].str.upper() \
@@ -577,6 +586,9 @@ def tag_relevant(input_df):
     pd.set_option('mode.chained_assignment', None)
 
     message('Tagging relevant data')
+
+    other_col_list = td.read_other_cols_db()
+    other_col_vals = td.read_other_tag_vals_db()
     
     # Loading Ngrams and corresponding Tags from SQLite Database
     conn = sqlite3.connect('Ngrams.sqlite')
@@ -613,8 +625,7 @@ def tag_relevant(input_df):
                     if n > 1:
                         error = True
                     result = ngram_df["ngramTag"].values[test.index[0]]
-                    v = 1
-  
+            
         p += 1
         # Time difference from start of process to now
         timediff = datetime.timedelta(seconds=round(time.time() \
@@ -642,6 +653,19 @@ def tag_relevant(input_df):
                 input_df.loc[a, "Edit"] = ""
                 input_df.loc[a, "Quality"] = 1
                 counter += 1
+
+                for o_col in other_col_list:
+                    try:
+                        tmp_col = other_col_vals[(other_col_vals['Col'] == o_col) &
+                                                (other_col_vals['Tag'] == result)]
+                        tmp_val = tmp_col['Val'].item()
+                    except:
+                        tmp_val = None
+                    if tmp_val == None or tmp_val == 'None': 
+                        input_df.loc[a, o_col] = ""
+                    else:
+                        input_df.loc[a, o_col] = tmp_val
+
             # If there has been an error it is not a clear non relevant Tag
             # and therefore it is new, which is indicated in the Edit column
             if error is True:
@@ -670,7 +694,7 @@ def tag_other(input_df):
     conn = sqlite3.connect('Ngrams.sqlite')
     tmp_tab = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table";', conn)
     for tab in tmp_tab['name']:
-        if '_Col_' in tab:
+        if 'relNgrams_Col_' in tab:
             try:
                 tables.append(tab)
             except:
@@ -742,31 +766,50 @@ def tag_other(input_df):
     return tagged, untagged
 
 # Find similar entries in a given dataframe with Levenshtein distance
-def find_similar(w, df):
+def find_similar(w, df, other_col_list):
     w = w.upper()
     quality = 0.0
     result = ''
+    other_result = []
     match = difflib.get_close_matches(w, df['Text'].astype(str), 1, 0.25)
     if len(match) > 0:
         str_match = match[0]
         s = difflib.SequenceMatcher(None, str_match, w, autojunk=True).ratio()
         result_df = df[(df['Text'] == str_match)]
         result = result_df['Tag'].values[0]
+        for o_col in other_col_list:
+            tmp_row = [o_col]
+            tmp_row.append(result_df[o_col].values[0])
+            other_result.append(tmp_row)
         quality = float(format(s, '0.02f'))
-    return result, quality
+    other_df = pd.DataFrame(other_result, columns=['Col', 'Val'])
+    return result, quality, other_df
 
 # Assign tags to input data by applying Levenshtein distance
 def lev_tagging(in_df, learn_df, proc_num):
+
+    other_col_list = td.read_other_cols_db()
+
     progress_old = 0
     p = 0
     length = len(in_df.index)
     existing_start = time.time()
     for a, b in in_df.iterrows():
         # Call the Levenshtein distance calculation function
-        result, quality = find_similar(b.Text, learn_df)
+        result, quality, other_result = find_similar(b.Text, learn_df, other_col_list)
         in_df.loc[a, 'Tag'] = result
         in_df.loc[a, 'Quality'] = quality
-
+        for o_col in other_col_list:
+            try:
+                tmp_col = other_result[other_result['Col'] == o_col]
+                tmp_val = tmp_col['Val'].item()
+            except:
+                tmp_val = None
+            if tmp_val == None or tmp_val == 'None': 
+                in_df.loc[a, o_col] = ""
+            else:
+                in_df.loc[a, o_col] = tmp_val
+        
         p += 1
         
         # Time difference from start of process to now
@@ -824,3 +867,45 @@ def tag_lev_df(in_df, learn_df, cores, max_lines):
                 found_df = q
     print()
     return found_df
+
+def maxcol(newData, work_data):
+
+    message('Removing not aligned columns')
+
+    org_length = len(newData)
+
+    for col_name in work_data.columns:
+        if work_data[col_name].dtype == object:
+            col_series = work_data[col_name].str.len()
+            if len(col_series.groupby(col_series)) == 1:
+                newData = newData[newData[col_name].str.match('\w{'+str(col_series[0])+'}$')] 
+    print('Remaining input data entries:', len(newData), 'of', org_length)
+    return newData
+
+# Return a list with all tags from the tag column
+def get_all_tags(learn_df):
+    all_tags = learn_df['Tag'].unique()
+    return all_tags
+
+# Assign other columns to tag in order to fill up that column while tagging
+def tag_to_other(other_cols, learn_df, newData):
+
+    message('Identifying content for other columns')
+
+    other_cols_list = []
+    all_tags = get_all_tags(learn_df)
+    for o_col in other_cols:
+        if newData[o_col].isnull().all():
+            other_cols_list.append(o_col)
+            print("Found column:", o_col)
+
+    tag_other_list = []
+
+    for tag in all_tags:
+        tag_df = learn_df[learn_df['Tag'] == tag]
+        for i_col in other_cols_list:
+            tmp_other_list = [i_col, tag, tag_df[i_col].mode().get(0)]
+            tag_other_list.append(tmp_other_list)
+    tag_other_df = pd.DataFrame(tag_other_list, columns=['Col','Tag','Val'])
+    td.write_other_cols_db(tag_other_df)
+    return
