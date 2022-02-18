@@ -72,7 +72,6 @@ def read_xl_learn(learn_file, wsheet, max_rows, max_cols, tag_col, text_col):
         if dfs[sheet_col].dtypes == object:
             dfs[sheet_col] = dfs[sheet_col].astype(str)
         
-    print(dfs)
     return dfs
 
 # Write log file
@@ -297,7 +296,7 @@ def writeXLS(filename_w, results, tag_col, text_col):
             col_name = text_col
             sheet.column_dimensions[get_column_letter(a)].width = 60
         sheet.cell(row=1, column=a).value = col_name
-        sheet.cell(row=1, column=a).font = Font(name='Calibri', size=10)
+        sheet.cell(row=1, column=a).font = Font(name='Arial', size=10)
         a += 1
 
     # Start in row 2 after the header row
