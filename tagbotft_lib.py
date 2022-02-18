@@ -17,9 +17,9 @@ import tagbotft_lib_db as td
 
 def message(msg_text):
     print()
-    print("-------------------------------------------------------")
+    print("-"*78)
     print(msg_text+"...")
-    print("-------------------------------------------------------")
+    print("-"*78)
     return
     
 # Convert input array to dataframe and assign "relevant"/"non_relevant" as tag
@@ -295,7 +295,7 @@ def tag_non_relevant(input_df):
     message('Tagging not relevant data first')
     
     # Loading Ngrams and corresponding Tags from SQLite Database
-    conn = sqlite3.connect('Ngrams.sqlite')
+    conn = sqlite3.connect('tagbotft.sqlite')
     ngram_df = pd.read_sql('select * from relNgrams_Text', conn)
         
     # Split the Text into Ngrams / words
@@ -313,6 +313,8 @@ def tag_non_relevant(input_df):
         n = 0
         result = None
         error = False
+
+        test_str = input_df.loc[a, "Text"]
         
         # The Ngrams are in b
         for m in b:
@@ -591,7 +593,7 @@ def tag_relevant(input_df):
     other_col_vals = td.read_other_tag_vals_db()
     
     # Loading Ngrams and corresponding Tags from SQLite Database
-    conn = sqlite3.connect('Ngrams.sqlite')
+    conn = sqlite3.connect('tagbotft.sqlite')
     ngram_df = pd.read_sql('select * from genNgrams_Text', conn)
         
     # Split the Text into Ngrams / words
@@ -691,7 +693,7 @@ def tag_other(input_df):
     
     # Loading Ngrams and corresponding Tags from SQLite Database
     tables = []
-    conn = sqlite3.connect('Ngrams.sqlite')
+    conn = sqlite3.connect('tagbotft.sqlite')
     tmp_tab = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table";', conn)
     for tab in tmp_tab['name']:
         if 'relNgrams_Col_' in tab:
