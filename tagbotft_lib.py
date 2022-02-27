@@ -59,7 +59,7 @@ def get_ngrams_df(df):
         df_tmp = df_ngrams[['Tag', num_col]]
         df_tmp = df_tmp.rename(columns={"Tag" : "ngramTag", num_col : "Ngram"})
         try:
-            exploded_df = exploded_df.append(df_tmp, ignore_index=True)
+            exploded_df = pd.concat([exploded_df, df_tmp], ignore_index=True)
         except:
             exploded_df = df_tmp
     
@@ -79,7 +79,7 @@ def count_df(df_ngrams, max_lines):
     for i, j in df_ngrams.iterrows(): 
         for k in j:
             if k != None and k != "not_relevant" and k != "relevant":
-                df_ngram_all = df_ngram_all.append({"Tag" : j["Tag"], \
+                df_ngram_all = df_ngram_all.concat({"Tag" : j["Tag"], \
                                         "Ngram" : k, "Count" : 1}, \
                                         ignore_index=True)
         p += 1
@@ -377,7 +377,41 @@ def tag_non_relevant(input_df):
     #print(tagged)    
     return tagged, untagged
 
-def get_existing_proc(in_df, learn_df):
+def get_in_df_cols(in_df, learn_df):
+
+    in_df_copy = in_df.copy()
+    in_df_testcopy = in_df.copy()
+    in_df_testcopy = in_df_testcopy.astype(str)
+    learn_df_copy = learn_df.copy()
+
+    for col in in_df_copy.columns:
+        col_type = in_df_copy[col].dtypes
+        if col_type == object:
+            in_df_copy[col] = in_df_copy[col].str.replace(' ', '')
+    
+    df_length = len(in_df_copy.index)
+
+    comp_cols = []
+    excl_cols = []
+
+    for ncol in list(learn_df_copy.columns.values):
+        if (len(in_df_testcopy[in_df_testcopy[ncol].str.len()>0]) > 0):
+            try:
+                comp_cols.append(ncol)
+            except:
+                comp_cols = ncol
+        else:
+            try:
+                excl_cols.append(ncol)
+            except:
+                excl_cols = ncol
+    print("Use cols:", comp_cols)
+    print()
+    print("Excl cols:", excl_cols)
+    print()
+    return comp_cols, excl_cols
+
+def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
     from functools import reduce
 
     count = 0
@@ -387,7 +421,6 @@ def get_existing_proc(in_df, learn_df):
     in_df_testcopy = in_df.copy()
     in_df_testcopy = in_df_testcopy.astype(str)
     learn_df_copy = learn_df.copy()
-    #learn_df_copy = learn_df_copy.astype(str)
 
     for col in in_df_copy.columns:
         col_type = in_df_copy[col].dtypes
@@ -405,14 +438,6 @@ def get_existing_proc(in_df, learn_df):
 
     existing_start = time.time()
     total_count = 0    
-    comp_cols = []
-
-    for ncol in list(learn_df_copy.columns.values):
-        if len(in_df_testcopy[in_df_testcopy[ncol].str.len()>0]) == df_length:
-            try:
-                comp_cols.append(ncol)
-            except:
-                comp_cols = ncol
 
     exclude_cols = td.read_other_cols_db()
 
@@ -423,7 +448,7 @@ def get_existing_proc(in_df, learn_df):
         for head in comp_cols:
             if head == "Tag":
                 continue
-            if head in exclude_cols:
+            if head in exclude_cols or head in excl_cols:
                 continue
             # If not a tag column add the comparison to conditions list
             # In case of string comparison apply uppercase on the dataframe
@@ -440,6 +465,17 @@ def get_existing_proc(in_df, learn_df):
         test = learn_df_copy.loc[np.logical_and.reduce(comparisons)]
 
         if len(test) > 0:
+            # Check if there is not a unique tag available
+            if len(test.groupby(['Tag'])) != 1:
+                print("Error:", test['Tag'])
+            
+            for ecol in excl_cols:
+                # Take the first tag result anyway
+                tmp_DF = test[ecol].values[0]
+                if tmp_DF == "None": tmp_DF = ""
+                # And assign it to the input DataFrame: existing data gets tagged
+                in_df.loc[a, ecol] = tmp_DF
+
             found_lst.append(in_df.loc[a])
             count += 1
 
@@ -480,43 +516,45 @@ def get_existing_proc(in_df, learn_df):
     # Return the existing and not existing data
     return found_df, not_found_df
 
-def get_existing(in_df, learn_df, cores, max_lines):
+def get_existing(newData, work_data, cores, max_lines):
 
     message("Identifying existing data")
 
     start = 0
     proc_num = []
-    end = len(in_df.index)
+    end = len(newData.index)
+
+    comp_cols, excl_cols = get_in_df_cols(newData, work_data)
 
     # One process gets all data
     if cores < 2:
         # One process means all data for that process and one process only
-        found_df, not_found_df = get_existing_proc(in_df, learn_df)
+        found_df, not_found_df = get_existing_proc(newData, work_data)
         
     # multiple processes require data partitioned 
     else:
         # Define a list of processes form a range
         proc_num = [*range(1, cores + 1)]
         
-        part_ngrams = np.array_split(in_df, cores)
+        part_ngrams = np.array_split(newData, cores)
 
-        #partialCount = partial(count_df, ngrams=ngrams)
         pool = mp.Pool(processes=cores)
     
         # Define the processing queues with function to call and data together
         # with process number
         pqueue = pool.starmap(get_existing_proc, zip(part_ngrams, \
-                            repeat(learn_df)))
+                            repeat(work_data), repeat(comp_cols), \
+                            repeat(excl_cols)))
         pool.close()
         pool.join()
         # Iterate the Pool segments for results to build the complete results
         for q in pqueue:
             try:
-                found_df = found_df.append(q[0], ignore_index=True)
+                found_df = pd.concat([found_df, q[0]], ignore_index=True)
             except:
                 found_df = q[0]
             try:
-                not_found_df = not_found_df.append(q[1], ignore_index=True)
+                not_found_df = pd.concat([not_found_df, q[1]], ignore_index=True)
             except:
                 not_found_df = q[1]
 
@@ -540,8 +578,8 @@ def count_tags_df(df_ngrams, max_lines):
     for i, j in df_ngrams.iterrows(): 
         for k in j:
             if k != None and k != j["Tag"]:
-                df_ngram_all = df_ngram_all.append({"Tag" : j["Tag"], \
-                                        "Ngram" : k, "Count" : 1}, \
+                df_ngram_all = pd.concat([df_ngram_all, {"Tag" : j["Tag"], \
+                                        "Ngram" : k, "Count" : 1}], \
                                         ignore_index=True)
         p += 1
         progress = round(p/length*100)
@@ -864,25 +902,11 @@ def tag_lev_df(in_df, learn_df, cores, max_lines):
         # Iterate the Pool segments for results to build the complete results
         for q in pqueue:
             try:
-                found_df = found_df.append(q, ignore_index=True)
+                found_df = pd.concat([found_df, q], ignore_index=True)
             except:
                 found_df = q
     print()
     return found_df
-
-def maxcol(newData, work_data):
-
-    message('Removing not aligned columns')
-
-    org_length = len(newData)
-
-    for col_name in work_data.columns:
-        if work_data[col_name].dtype == object:
-            col_series = work_data[col_name].str.len()
-            if len(col_series.groupby(col_series)) == 1:
-                newData = newData[newData[col_name].str.match('\w{'+str(col_series[0])+'}$')] 
-    print('Remaining input data entries:', len(newData), 'of', org_length)
-    return newData
 
 # Return a list with all tags from the tag column
 def get_all_tags(learn_df):
@@ -909,5 +933,32 @@ def tag_to_other(other_cols, learn_df, newData):
             tmp_other_list = [i_col, tag, tag_df[i_col].mode().get(0)]
             tag_other_list.append(tmp_other_list)
     tag_other_df = pd.DataFrame(tag_other_list, columns=['Col','Tag','Val'])
+
+    # Prevent errors by changing data types to string
+    tag_other_df['Val']= tag_other_df['Val'].astype('str')
+    tag_other_df['Tag']= tag_other_df['Tag'].astype('str')
     td.write_other_cols_db(tag_other_df)
     return
+
+# Keep only aligned rows in string columns 
+def maxcol(newData, work_data):
+
+    message('Removing not aligned entries')
+
+    # Get the total number of rows at start
+    org_length = len(newData)
+
+    # Iterate over all the existing columns
+    for col_name in work_data.columns:
+        # Only iterate if the column is a string column
+        if work_data[col_name].dtype == object:
+            # Get the length of the column
+            col_length = work_data[col_name].str.len()
+            # Get the data where there is only one length
+            if len(col_length.groupby(col_length)) == 1:
+                print(col_name, len(col_length.groupby(col_length)))
+                # Keep the matching rows according
+                newData = newData[newData[col_name].str.match('\w{'\
+                        +str(col_length[0])+'}$')]
+    print('Remaining input data entries:', len(newData), 'of', org_length)
+    return newData
