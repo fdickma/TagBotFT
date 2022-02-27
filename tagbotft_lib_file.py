@@ -86,7 +86,10 @@ def writeLog(logEvent):
 # Dickmann / Birkenkamp
 # Read SAP data files with RegEx to identify relevant data lines and items
 # Input files can come from Kosten, GWGs oder Anlagen
-def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
+def read_SAP_1(files: str, test_len: int, test: bool, exclude_file, work_data):
+
+    # Reading exclude file
+    exclude_df = readExclude(exclude_file)
 
     tl.message("Loading SAP data files...")
 
@@ -182,7 +185,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
                             convertAmount(mc.group(5)),        # Amount.
                             mc.group(4),                          # Date.
                             mc.group(1).strip(),                  # Year.
-                            'b', None,
+                            'b', '',
                             mc.group(8).strip()))                 # Ref. num.
                         rownum += 1
                         lineCounter += 1
@@ -200,7 +203,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
                             convertAmount(ma.group(5)),        # Amount.
                             mc.group(2),                          # Date.
                             ma.group(3).strip(),                  # Year.
-                            'b', None,
+                            'b', '',
                             ma.group(2).strip()))                 # Anl. num.
                         rownum += 1
                         lineCounter += 1
@@ -218,7 +221,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
                             convertAmount(ma.group(6)),        # Amount.
                             ma.group(3),                          # Date.
                             ma.group(4).strip(),                  # Year.
-                            'b', None,
+                            'b', '',
                             ma.group(1).strip()))                 # Ref. num.
                         rownum += 1
                         lineCounter += 1
@@ -236,7 +239,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
                             convertAmount(ma.group(4)),        # Amount.
                             ma.group(2),                          # Date.
                             ma.group(3).strip(),                  # Year.
-                            'b', None,
+                            'b', '',
                             ma.group(8).strip()))                 # Ref. num.
                         rownum += 1
                         lineCounter += 1
@@ -255,9 +258,13 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_df):
                      'Beschaffungsklasse', 'CKA', 'Referenz'])
     
     df['Datum'] = pd.to_datetime(df['Datum'], format='%d.%m.%Y')
+    df = df.replace(r"^None$", '', regex=True)
 
     # Filtering the the SAP data by the exclude data
     newData = filter_input(df, exclude_df)
+
+    # Remove uneven string columns
+    newData = tl.maxcol(newData, work_data)
 
     return newData
 

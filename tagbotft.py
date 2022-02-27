@@ -7,8 +7,6 @@ import os
 import platform
 import pandas as pd
 import sys
-import re
-import multiprocessing as mp
 import numpy as np
 import time
 import datetime
@@ -16,7 +14,8 @@ from itertools import repeat
 
 import tagbotft_lib as tl
 import tagbotft_lib_file as tf
-    
+import tagbotft_lib_db as td
+
 #
 # TagBotFT starts
 #
@@ -34,24 +33,18 @@ if __name__ == '__main__':
     parser.add_argument(
         '-l', '--logfile', help='Log console to file', action='store_true')
     parser.add_argument(
-        '-m', '--maxcol', help='Use maximum length in a columns', action='store_true')
-    parser.add_argument(
         '-n', '--newlearn', help='Process learning data', action='store_true')
+    parser.add_argument(
+        '-r', '--reload', help='Reload learning database', action='store_true')
     args = parser.parse_args()
     
     # Test run limits the amounts of input data
     if args.test:
-        max_lines = 1000
+        max_lines = 10000000
         max_input = 1000
         test = True
         print('Running in TEST mode! Using less data to speed things up...')
     
-    # Check if learning data is to be processed
-    if args.newlearn:
-        newlearn = True
-    else:
-        newlearn = False
-
     # If not in Test mode, use as many input data as possible
     if not args.test:
         max_lines = 100000000
@@ -75,29 +68,29 @@ if __name__ == '__main__':
     dbf = "tagbotft.sqlite"
     org_file = 'learn_data.xlsx'
     wsheet = "Komplett"
-    non_relevant = "y"
+    non_relevant_tag = "y"
+    exclude_file = "excludes.lst"
     tag_col_txt = 'System'
     text_col_txt = 'Beschreibung'
     max_cols = 11
 
-    # Reading exclude file
-    exclude_df = tf.readExclude("excludes.lst")
+    # Only read the initial data when necessary
+    if args.reload:
+        # Reading data from Excel file
+        work_data = tf.read_xl_learn(org_file, wsheet, max_lines, max_cols, \
+                                tag_col_txt, text_col_txt)
+        td.write_learn_db(work_data)
 
+    work_data = td.read_learn_db()
+    
     # Read the SAP data into one list
-    newData = tf.read_SAP_1('*.TXT', max_input, test, exclude_df)
-
-    # Reading data from Excel file
-    work_data = tf.read_xl_learn(org_file, wsheet, max_lines, max_cols, \
-                            tag_col_txt, text_col_txt)
-
-    if args.maxcol == True:
-        newData = tl.maxcol(newData, work_data)
+    newData = tf.read_SAP_1('*.TXT', max_input, test, exclude_file, work_data)
 
     # Generate a dataframe from working data
-    learn_df = tl.get_df(work_data, non_relevant)
+    learn_df = tl.get_df(work_data, non_relevant_tag)
 
     # Start learning from already tagged data
-    if newlearn:
+    if args.newlearn:
         # Generate Ngrams for relevant/non-relevant from text column
         text_df, non_text_df = tl.get_text_df(learn_df)
 
@@ -116,7 +109,9 @@ if __name__ == '__main__':
    
     # Writing existing entries to Excel file
     tf.writeXLS('result_data_old.xlsx', old_df, tag_col_txt, text_col_txt)
-    
+
+    exit()
+
     # Stage 1 - tagging the not relevant data first
     tagged_non_relevant, untagged = tl.tag_non_relevant(new_df)
 
@@ -130,9 +125,9 @@ if __name__ == '__main__':
     tagged_similar = tl.tag_lev_df(untagged, work_data, cores, max_lines)
 
     # Concatenating results from the four stages
-    tagged = tagged_non_relevant.append(tagged_other)
-    tagged = tagged.append(tagged_relevant)
-    tagged = tagged.append(tagged_similar)
+    tagged = pd.concat([tagged_non_relevant, tagged_other])
+    tagged = pd.concat([tagged, tagged_relevant])
+    tagged = pd.concat([tagged, tagged_similar])
 
     print('Tagged data: ' + str(len(tagged)))
 
