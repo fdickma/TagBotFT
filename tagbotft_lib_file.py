@@ -27,31 +27,36 @@ def filter_input(in_df, filter_df):
         .isin(filter_df[col].astype(str).tolist()).any(axis=1)]
     return newData
 
-# Read input data from excel file and a defined worksheet
-def read_xl_learn(learn_file, wsheet, max_rows, max_cols, tag_col, text_col):
+def read_xl_learn_data(f, max_cols, max_rows, org_data):
+
     from openpyxl import load_workbook
 
     # Loading data file with a maximum number of lines
-    tl.message("Reading Excel data sheet")
-    wb = load_workbook(learn_file, data_only=True, read_only=True)
-    sheet = wb[wsheet]
+    tl.message("Reading Excel data sheet: " + f)
+    wb = load_workbook(f, data_only=True, read_only=True)
+    # sheet = wb[wsheet]
+    sheet = wb.active
     
     # Get the real maximum of lines to read
     if sheet.max_row < max_rows:
         max_rows = sheet.max_row
-
-    org_data = []
+    
     # Start with no lines read
     line_count = 0
+    
     for row in sheet.rows:
         wsrow = []
-        row_i = 0
+        col_i = 0
         for cell in row:
-            if row_i < max_cols:
+            if col_i < max_cols:
                 wsrow.append(cell.value)
-                row_i += 1
+                col_i += 1
         if line_count > max_rows:
             break
+        # Skip if a header row has been already read
+        if (len(org_data) > 0) and (line_count == 0):
+            line_count += 1
+            continue
         else:
             org_data.append(wsrow)
             # Calculating the progress as percentage
@@ -59,7 +64,25 @@ def read_xl_learn(learn_file, wsheet, max_rows, max_cols, tag_col, text_col):
             line_count += 1
             print("Reading file: %.2f %%" % progress, end='\r', flush=True)
     print(f'\n\rLoaded {line_count} lines.')
-    print("Headers:", org_data[0])
+    wb.close()
+    
+    return org_data
+
+# Read input data from excel file and a defined worksheet
+def read_xl_learn(files, wsheet, max_rows, max_cols, tag_col, text_col):
+
+    file_list = list(glob.glob(files))
+    org_data = []    
+
+    for f in file_list:
+        try:
+            rf = open(f, encoding='latin-1')
+        except FileNotFoundError:
+            print('File ' + f + ' not found.')
+        else:
+            org_data = read_xl_learn_data(f, max_cols, max_rows, org_data)
+
+    print("\n\rHeaders:", org_data[0])
 
     # Arrange the Excel data in a Pandas dataframe
     dfs = pd.DataFrame(data=org_data[1:], columns=org_data[0])
@@ -71,7 +94,9 @@ def read_xl_learn(learn_file, wsheet, max_rows, max_cols, tag_col, text_col):
     for sheet_col in dfs:
         if dfs[sheet_col].dtypes == object:
             dfs[sheet_col] = dfs[sheet_col].astype(str)
-        
+
+    print(f'\n\rLoaded {len(dfs)} lines.')
+
     return dfs
 
 # Write log file
