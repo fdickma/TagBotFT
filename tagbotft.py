@@ -66,7 +66,7 @@ if __name__ == '__main__':
     # Setting initial parameters
     org_data = []
     dbf = "tagbotft.sqlite"
-    org_file = 'learn_data.xlsx'
+    org_file = 'learn_data_*.xlsx'
     wsheet = "Komplett"
     non_relevant_tag = "y"
     exclude_file = "excludes.lst"

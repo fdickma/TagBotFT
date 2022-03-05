@@ -412,6 +412,7 @@ def get_in_df_cols(in_df, learn_df):
     return comp_cols, excl_cols
 
 def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
+    
     from functools import reduce
 
     count = 0
@@ -467,7 +468,9 @@ def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
         if len(test) > 0:
             # Check if there is not a unique tag available
             if len(test.groupby(['Tag'])) != 1:
-                print("Error:", test['Tag'])
+                print("\nError:", test['Tag'])
+                test.to_csv('errors.csv', mode='a', sep='\t', index=True, \
+                            header=False)
             
             for ecol in excl_cols:
                 # Take the first tag result anyway
