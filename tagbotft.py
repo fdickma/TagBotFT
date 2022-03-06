@@ -35,7 +35,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-n', '--newlearn', help='Process learning data', action='store_true')
     parser.add_argument(
-        '-r', '--reload', help='Reload learning database', action='store_true')
+        '-r', '--rebuild', help='Rebuild learning database', action='store_true')
     args = parser.parse_args()
     
     # Test run limits the amounts of input data
@@ -75,13 +75,13 @@ if __name__ == '__main__':
     max_cols = 11
 
     # Only read the initial data when necessary
-    if args.reload:
+    if args.rebuild:
         # Reading data from Excel file
         work_data = tf.read_xl_learn(org_file, wsheet, max_lines, max_cols, \
                                 tag_col_txt, text_col_txt)
         td.write_learn_db(work_data)
-
-    work_data = td.read_learn_db()
+    else:
+        work_data = td.read_learn_db()
     
     # Read the SAP data into one list
     newData = tf.read_SAP_1('*.TXT', max_input, test, exclude_file, work_data)
@@ -109,8 +109,6 @@ if __name__ == '__main__':
    
     # Writing existing entries to Excel file
     tf.writeXLS('result_data_old.xlsx', old_df, tag_col_txt, text_col_txt)
-
-    exit()
 
     # Stage 1 - tagging the not relevant data first
     tagged_non_relevant, untagged = tl.tag_non_relevant(new_df)
