@@ -62,7 +62,7 @@ def read_xl_learn_data(f, max_cols, max_rows, org_data):
             # Calculating the progress as percentage
             progress = line_count / max_rows * 100
             line_count += 1
-            print("Reading file: %.2f %%" % progress, end='\r', flush=True)
+            print("Reading file: %.0f %%" % round(progress), end='\r', flush=True)
     print(f'\n\rLoaded {line_count} lines.')
     wb.close()
     

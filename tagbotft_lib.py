@@ -814,6 +814,7 @@ def find_similar(w, df, other_col_list):
     quality = 0.0
     result = ''
     other_result = []
+    # Call the Levenshtein distance calculation function
     match = difflib.get_close_matches(w, df['Text'].astype(str), 1, 0.25)
     if len(match) > 0:
         str_match = match[0]
@@ -924,9 +925,13 @@ def tag_to_other(other_cols, learn_df, newData):
     other_cols_list = []
     all_tags = get_all_tags(learn_df)
     for o_col in other_cols:
-        if newData[o_col].isnull().all():
-            other_cols_list.append(o_col)
-            print("Found column:", o_col)
+        if newData.dtypes[o_col] == np.object:
+            count_empty = newData[o_col].str.match("").sum()
+            count_null = newData[o_col].isnull()
+            count_col = len(newData[o_col])
+            if count_empty == count_col or count_null == count_col:
+                other_cols_list.append(o_col)
+                print("Found column:", o_col)
 
     tag_other_list = []
 
