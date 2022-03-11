@@ -66,7 +66,7 @@ if __name__ == '__main__':
     # Setting initial parameters
     org_data = []
     dbf = "tagbotft.sqlite"
-    org_file = 'learn_data_*.xlsx'
+    org_file = 'learn_data*.xlsx'
     wsheet = "Komplett"
     non_relevant_tag = "y"
     exclude_file = "excludes.lst"
@@ -104,7 +104,7 @@ if __name__ == '__main__':
         tl.tag_to_other(other_cols, work_data, newData)
 
     # Divide the new data into existing and new entries
-    # Only new entries will be further processed 
+    # Only new entries will be further processed after this step
     old_df, new_df = tl.get_existing(newData, work_data, cores, max_lines)
    
     # Writing existing entries to Excel file
