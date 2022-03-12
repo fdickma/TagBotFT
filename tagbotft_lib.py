@@ -706,7 +706,11 @@ def tag_relevant(input_df):
                         tmp_val = None
                     if tmp_val == None or tmp_val == 'None': 
                         input_df.loc[a, o_col] = ""
+                    if input_df.loc[a, o_col] != "" and input_df.loc[a, o_col] != None \
+                    and len(str(input_df.loc[a, o_col])) > 0:
+                        continue
                     else:
+                        #print(a, o_col, "--", tmp_val, "--")
                         input_df.loc[a, o_col] = tmp_val
 
             # If there has been an error it is not a clear non relevant Tag
@@ -849,9 +853,14 @@ def lev_tagging(in_df, learn_df, proc_num):
                 tmp_val = tmp_col['Val'].item()
             except:
                 tmp_val = None
+            
             if tmp_val == None or tmp_val == 'None': 
                 in_df.loc[a, o_col] = ""
+            if in_df.loc[a, o_col] != "" and in_df.loc[a, o_col] != None \
+            and len(str(in_df.loc[a, o_col])) > 0:
+                continue
             else:
+                #print(a, o_col, "--", tmp_val, "--")
                 in_df.loc[a, o_col] = tmp_val
         
         p += 1
