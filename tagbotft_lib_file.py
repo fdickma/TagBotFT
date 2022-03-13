@@ -116,7 +116,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_file, work_data):
     # Reading exclude file
     exclude_df = readExclude(exclude_file)
 
-    tl.message("Loading SAP data files...")
+    tl.message("Loading SAP data files")
 
     # Extract unclassified data from possibly several files, ignoring
     # data rows with cost centres contained in a list of cost centres to
@@ -370,9 +370,16 @@ def writeXLS(filename_w, results, tag_col, text_col):
 
 # Read the excludes file into dataframe 
 def readExclude(filename):
-    tl.message("Reading Kostenstellen exclude list")
+    tl.message("Reading exclude list")
     try:
+        # Pandas CSV function takes the first line as column name
         df = pd.read_csv(filename, delimiter=' ')
+        print("Columns with exclude data:", list(df.columns))
     except FileNotFoundError:
         sys.exit('File ' + filename + ' not found.')
+    
+    # In case of no exclude file just return an empty dataframe
+    if len(df) < 1:
+        df = pd.DataFrame()
+
     return df

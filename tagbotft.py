@@ -24,6 +24,8 @@ if __name__ == '__main__':
     # Get the number of available CPU cores    
     cores = os.cpu_count()
 
+    tl.message('\nStarting TagBotFT -- Tag Bot for Tables\n')
+
     # Using parameter to enable Test mode for faster testing.
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -80,8 +82,9 @@ if __name__ == '__main__':
         work_data = tf.read_xl_learn(org_file, wsheet, max_lines, max_cols, \
                                 tag_col_txt, text_col_txt)
         td.write_learn_db(work_data)
-    else:
-        work_data = td.read_learn_db()
+        
+    # Reading the data from database ensures clear column formats
+    work_data = td.read_learn_db()
     
     # Read the SAP data into one list
     newData = tf.read_SAP_1('*.TXT', max_input, test, exclude_file, work_data)
