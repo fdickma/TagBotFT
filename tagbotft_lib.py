@@ -860,7 +860,6 @@ def lev_tagging(in_df, learn_df, proc_num):
             and len(str(in_df.loc[a, o_col])) > 0:
                 continue
             else:
-                #print(a, o_col, "--", tmp_val, "--")
                 in_df.loc[a, o_col] = tmp_val
         
         p += 1
