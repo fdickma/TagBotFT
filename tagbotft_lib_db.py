@@ -69,7 +69,7 @@ def write_learn_db(learn_data):
 # Read the learn data from an SQLite database
 def read_learn_db():
     # Open database connection
-    tl.message("Reading database with learned data... ")
+    tl.message("Reading database with learned data")
     conn = sqlite3.connect('tagbotft_learn.sqlite', \
             detect_types=sqlite3.PARSE_DECLTYPES)
     df = pd.read_sql('select * from learn_data', conn)

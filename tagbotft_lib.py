@@ -18,7 +18,7 @@ import tagbotft_lib_db as td
 def message(msg_text):
     print()
     print("-"*78)
-    print(msg_text+"...")
+    print(msg_text)
     print("-"*78)
     return
     
@@ -947,7 +947,12 @@ def tag_to_other(other_cols, learn_df, newData):
     for tag in all_tags:
         tag_df = learn_df[learn_df['Tag'] == tag]
         for i_col in other_cols_list:
-            tmp_other_list = [i_col, tag, tag_df[i_col].mode().get(0)]
+            # Only take the result if it is unique
+            # Otherwise assign <REPLACE> as an indicator for manual input
+            if len(tag_df.groupby([i_col])) == 1:
+                tmp_other_list = [i_col, tag, tag_df[i_col].mode().get(0)]
+            else:
+                tmp_other_list = [i_col, tag, "<REPLACE>"]
             tag_other_list.append(tmp_other_list)
     tag_other_df = pd.DataFrame(tag_other_list, columns=['Col','Tag','Val'])
 
