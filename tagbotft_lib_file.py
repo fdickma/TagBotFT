@@ -22,10 +22,13 @@ def convertAmount(amount: str) -> float:
 # Filter input dataframe by a filter dataframe
 def filter_input(in_df, filter_df):
     # Iterate over all columns in the filter dataframe / exclude list
-    for col in filter_df:
-        newData = in_df[~in_df[[col]]\
-        .isin(filter_df[col].astype(str).tolist()).any(axis=1)]
-    return newData
+    if len(filter_df > 0):
+        for col in filter_df:
+            newData = in_df[~in_df[[col]]\
+            .isin(filter_df[col].astype(str).tolist()).any(axis=1)]
+        return newData
+    else:
+        return in_df
 
 def read_xl_learn_data(f, max_cols, max_rows, org_data):
 
@@ -371,15 +374,13 @@ def writeXLS(filename_w, results, tag_col, text_col):
 # Read the excludes file into dataframe 
 def readExclude(filename):
     tl.message("Reading exclude list")
+    
     try:
         # Pandas CSV function takes the first line as column name
         df = pd.read_csv(filename, delimiter=' ')
         print("Columns with exclude data:", list(df.columns))
-    except FileNotFoundError:
-        sys.exit('File ' + filename + ' not found.')
-    
-    # In case of no exclude file just return an empty dataframe
-    if len(df) < 1:
-        df = pd.DataFrame()
+        return df
 
-    return df
+    except FileNotFoundError:
+        print("No exclude file")
+        return pd.DataFrame()
