@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "tagbotft.py",
             "console": "integratedTerminal",
-            "args":["-n"],
+            "args":["-n", "-r"],
         }
     ]
 }
