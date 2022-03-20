@@ -70,7 +70,7 @@ def write_learn_db(learn_data):
             if (test_col == 'None') or (test_col == None) or (test_col == ''):
                 is_empty += 1
         # Check if nearly all colums of a row have been empty
-        if is_empty >= (learn_cols - 1):
+        if is_empty > (learn_cols - 3):
             empty_rows.append(index)
     
     # Filter out the empty rows from the dataframe
