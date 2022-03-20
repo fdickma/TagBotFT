@@ -61,6 +61,22 @@ def write_text_db(ngrams):
 
 # Write the learn data to an SQLite database
 def write_learn_db(learn_data):
+    # First scan the lean data result for empty lines
+    empty_rows = []
+    learn_cols = len(learn_data.columns)
+    for index, test_row in learn_data.iterrows():
+        is_empty = 0
+        for test_col in test_row:
+            if (test_col == 'None') or (test_col == None) or (test_col == ''):
+                is_empty += 1
+        # Check if nearly all colums of a row have been empty
+        if is_empty >= (learn_cols - 1):
+            empty_rows.append(index)
+    
+    # Filter out the empty rows from the dataframe
+    learn_data = learn_data[~learn_data.index.isin(empty_rows)]
+    print("Learned data lines:", len(learn_data))
+    
     # Store Ngrams and corresponding Tags in SQLite Database
     conn = sqlite3.connect('tagbotft_learn.sqlite', \
             detect_types=sqlite3.PARSE_DECLTYPES)

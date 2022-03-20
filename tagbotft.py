@@ -37,7 +37,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-n', '--newlearn', help='Process learning data', action='store_true')
     parser.add_argument(
-        '-r', '--rebuild', help='Rebuild learning database', action='store_true')
+        '-r', '--rebuild', help='Reload learning data', action='store_true')
     args = parser.parse_args()
     
     # Test run limits the amounts of input data
