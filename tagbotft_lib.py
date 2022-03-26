@@ -930,34 +930,57 @@ def tag_to_other(other_cols, learn_df, newData):
 
     message('Identifying content for other columns')
 
+    # Initialize the other columns results list
     other_cols_list = []
+
+    # Get all tags from learned data
     all_tags = get_all_tags(learn_df)
+    
+    # Iterate through the other cols list
     for o_col in other_cols:
+
+        # Only check further if it is a string column
         if newData.dtypes[o_col] == np.object:
+            # Get the number of empty strings in that column
             count_empty = newData[o_col].str.match("").sum()
+            # Get the number of null values in that column
             count_null = newData[o_col].isnull()
+            # Get the total length of the column
             count_col = len(newData[o_col])
+            # Only consider the column in the new data is completely empty
             if count_empty == count_col or count_null == count_col:
                 other_cols_list.append(o_col)
                 print("Found column:", o_col)
 
+    # Initialize the other columns tag list
     tag_other_list = []
 
+    # Iterate through all possible tags
     for tag in all_tags:
         tag_df = learn_df[learn_df['Tag'] == tag]
+        
+        # Initialize and re-initialize the temporary results list
+        tmp_other_list = []
+        
+        # Iterate through other columns
         for i_col in other_cols_list:
-            # Only take the result if it is unique
-            # Otherwise assign <REPLACE> as an indicator for manual input
-            if len(tag_df.groupby([i_col])) == 1:
+            # Only take the result if it is unique and not empty
+            if len(tag_df.groupby([i_col])) == 1 and \
+            len(tag_df[i_col].mode().get(0)) > 0:
                 tmp_other_list = [i_col, tag, tag_df[i_col].mode().get(0)]
-            else:
-                tmp_other_list = [i_col, tag, "<REPLACE>"]
+        
+        # Append the result to the other columns tag list
+        if len(tmp_other_list) > 0:
             tag_other_list.append(tmp_other_list)
     tag_other_df = pd.DataFrame(tag_other_list, columns=['Col','Tag','Val'])
 
     # Prevent errors by changing data types to string
     tag_other_df['Val']= tag_other_df['Val'].astype('str')
     tag_other_df['Tag']= tag_other_df['Tag'].astype('str')
+
+    print("Identified other columns items:", len(tag_other_df))
+
+    # Write the completed results to the database
     td.write_other_cols_db(tag_other_df)
     return
 
