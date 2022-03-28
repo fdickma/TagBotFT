@@ -626,11 +626,14 @@ def get_tags_df(df, non_ngrams):
 # Assign the relevant input data based on distinct Ngrams
 def tag_relevant(input_df):
 
+    # Because of working with slices of dataframes disable the warning
     pd.set_option('mode.chained_assignment', None)
 
     message('Tagging relevant data')
 
+    # Read the database entries of the other columns 
     other_col_list = td.read_other_cols_db()
+    # and additional other columns results
     other_col_vals = td.read_other_tag_vals_db()
     
     # Loading Ngrams and corresponding Tags from SQLite Database
@@ -697,6 +700,7 @@ def tag_relevant(input_df):
                 input_df.loc[a, "Quality"] = 1
                 counter += 1
 
+                # Iterate over the other columns list
                 for o_col in other_col_list:
                     try:
                         tmp_col = other_col_vals[(other_col_vals['Col'] == o_col) &
@@ -704,13 +708,19 @@ def tag_relevant(input_df):
                         tmp_val = tmp_col['Val'].item()
                     except:
                         tmp_val = None
-                    if tmp_val == None or tmp_val == 'None': 
+
+                    # When the new data is empty and the other column data is empty
+                    # make sure that the new data column stays empty
+                    if (tmp_val == None or tmp_val == 'None') and \
+                    len(str(input_df.loc[a, o_col])) == 0: 
                         input_df.loc[a, o_col] = ""
+                    
+                    # In case the new data of the other column is not empty keep it;
+                    # otherwise assign the result if that result is not empty
                     if input_df.loc[a, o_col] != "" and input_df.loc[a, o_col] != None \
                     and len(str(input_df.loc[a, o_col])) > 0:
                         continue
                     else:
-                        #print(a, o_col, "--", tmp_val, "--")
                         input_df.loc[a, o_col] = tmp_val
 
             # If there has been an error it is not a clear non relevant Tag
@@ -726,10 +736,12 @@ def tag_relevant(input_df):
     untagged = input_df[(input_df['Tag'] == '')]
     print('Tagged data: ' + str(len(tagged)))
     print('Untagged data: ' + str(len(untagged)))
+
+    # Re-enable the warning for working on sclices of dataframes
     pd.reset_option('mode.chained_assignment')
     return tagged, untagged
 
-# Assign the relevant input data based on distinct Ngrams
+# Assign the relevant input data based from the other columns
 def tag_other(input_df):
 
     pd.set_option('mode.chained_assignment', None)
@@ -965,7 +977,7 @@ def tag_to_other(other_cols, learn_df, newData):
         # Iterate through other columns
         for i_col in other_cols_list:
             # Only take the result if it is unique and not empty
-            if len(tag_df.groupby([i_col])) == 1 and \
+            if len(tag_df.groupby([i_col])) > 0 and \
             len(tag_df[i_col].mode().get(0)) > 0:
                 tmp_other_list = [i_col, tag, tag_df[i_col].mode().get(0)]
         
