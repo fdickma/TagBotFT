@@ -15,6 +15,7 @@ from difflib import SequenceMatcher
 import tagbotft_lib_file as tf
 import tagbotft_lib_db as td
 
+# Standard printout of TagBotFT messages
 def message(msg_text):
     print()
     print("-"*78)
@@ -83,15 +84,21 @@ def count_df(df_ngrams, max_lines):
                                         "Ngram" : k, "Count" : 1}, \
                                         ignore_index=True)
         p += 1
+        
+        # Calculate and print the progress
         progress = round(p/length*100)
         if progress > progress_old:
             progress_old = progress
             print('\rCount progress: ' + str(progress) + str(' % '), \
                   end="", flush=True)
+        
+        # If a maximum of lines is given, don't overstep that boundary
         if i > max_lines:
             break
+
     return df_ngram_all
 
+# Clean the Ngrams
 def clean_ngrams_df(ngrams_df, df, max_lines):
     # Delete all Ngrams with only one character
     ngrams_df = ngrams_df[ngrams_df['Ngram'].map(len) > 1]
@@ -115,6 +122,7 @@ def clean_ngrams_df(ngrams_df, df, max_lines):
 
     return df_ngram_uni
 
+# Discard Ngrams which are not good identifiers for tags
 def discard_df(ngrams_uni_df, df, max_lines):
     # Copy DataFrame without escape characters and add the columns Test and 
     # Check where Test contains the relevant or non_relevant result and Check
@@ -134,12 +142,14 @@ def discard_df(ngrams_uni_df, df, max_lines):
         # Get a data from the above data set where the Tag equals the tested 
         # Tag
         chk = d[d['Tag'].str.contains(re.escape(b[1]))]
+        
         # If the number of found Tags is not equal to the original data set, 
         # the Ngram is not a distinct identifier
         if len(chk) != len(d):
             n += 1
             print('\r' + 'Discarded: ' + str(n), end="", flush=True)
             discarded.append(b[0])
+        
         # Otherwise the Tag is a good identifier
         else:
             # If the data set is empty set c to the original data set        
@@ -149,45 +159,12 @@ def discard_df(ngrams_uni_df, df, max_lines):
             else:
                 unique_tags = unique_tags.append(d)
             l += 1    
+
+        # If a maximum of lines is given, don't overstep that boundary
         if l > (max_lines):
             break
 
     return unique_tags
-    
-def filter_df(unique_tags, max_lines, proc_num):
-    # Iterate through the de-escaped unique Tags
-    # Skip if the Test result and the original value/Tag are not equal
-    # In that case the Ngram is not a distinct identifier
-    n = 0
-    m = 0
-    p = 0
-    progress_old = 0
-    errors = []
-    length = len(unique_tags.index)
-        
-    for a, b in unique_tags.iterrows():
-        # Check if the Tag (2nd item)is the same as the Test (last -2 items)
-        if b[2] != b[len(b)-2]:
-            n += 1
-            errors.append(b[len(b)-1])
-        # Append the usable data line to the data set
-        else:
-            if m == 0:
-                usable_lines = pd.DataFrame(b).transpose()
-            else:
-                usable_lines = usable_lines.append(pd.DataFrame(b).transpose())
-            m += 1
-    
-        if a > max_lines * 10:
-            break
-        p += 1
-        progress = round(p/length*100)
-        if progress > progress_old:
-            progress_old = progress
-            print('\rFilter progress: ' + str(progress) + str(' % '), \
-                  end="", flush=True)
-        
-    return usable_lines
 
 # Return columns where more than 10% of the entries are unique
 def get_uni_cols(df):
@@ -273,18 +250,27 @@ def get_other_df(df):
     td.write_other_db(other_df_set)
     return other_df_set, other_cols
 
+# Return valid text Ngrams and write them to a database 
 def get_text_df(df):
 
     message("Identifying text column Ngrams")
 
     # Split dataframe in a new dataframe with ngrams
     ngrams_raw_df = get_ngrams_df(df)
+
+    # Group the Ngrams and according tags, then the size for each group
     ngrams_count = ngrams_raw_df.groupby(['Ngram', 'ngramTag'], as_index=False).size()
 
+    # Filter the Ngrams which are unique by getting those who are in a group
+    # with a length of 1
     ngrams = ngrams_count.groupby(['Ngram']).filter(lambda x : len(x)<2)
+
+    # Now get those groups with a length of more than 1
     non_ngrams = ngrams_count.groupby(['Ngram']).filter(lambda x : len(x)>1)
 
     print(f'Total usable: {len(ngrams.index)}')
+
+    # Write the resulting Ngrams to the Text column Ngram database
     td.write_rel_text_db(ngrams)
 
     return ngrams, non_ngrams
@@ -377,6 +363,8 @@ def tag_non_relevant(input_df):
     #print(tagged)    
     return tagged, untagged
 
+# Return input data columns that exist in learn data
+# Other columns are omitted
 def get_in_df_cols(in_df, learn_df):
 
     in_df_copy = in_df.copy()
@@ -384,6 +372,9 @@ def get_in_df_cols(in_df, learn_df):
     in_df_testcopy = in_df_testcopy.astype(str)
     learn_df_copy = learn_df.copy()
 
+    # First replace all spaces of string columns with empty values
+    # This prevents false detection of columns with only spaces as relevant
+    # columns later
     for col in in_df_copy.columns:
         col_type = in_df_copy[col].dtypes
         if col_type == object:
@@ -394,7 +385,9 @@ def get_in_df_cols(in_df, learn_df):
     comp_cols = []
     excl_cols = []
 
+    # Iterate over the learn data columns
     for ncol in list(learn_df_copy.columns.values):
+        # Only consider columns where the content is not empty
         if (len(in_df_testcopy[in_df_testcopy[ncol].str.len()>0]) > 0):
             try:
                 comp_cols.append(ncol)
@@ -613,8 +606,10 @@ def get_tags_df(df, non_ngrams):
 
     print('Ngram maximum columns:', len(ngrams_raw_df.columns))
     
+    # Only keep the Ngrams which are unique 
     tmp_ngrams = ngrams_raw_df.groupby(['Ngram']).filter(lambda x : len(x)<2)
 
+    # Filter the Ngrams by the given non-Ngrams
     ngrams = tmp_ngrams[~tmp_ngrams[['Ngram']]\
         .isin(non_ngrams.Ngram.tolist()).any(axis=1)]
 
