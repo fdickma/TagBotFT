@@ -30,6 +30,7 @@ def filter_input(in_df, filter_df):
     else:
         return in_df
 
+# Read learn data from an Excel file
 def read_xl_learn_data(f, max_cols, max_rows, org_data):
 
     from openpyxl import load_workbook
@@ -71,12 +72,14 @@ def read_xl_learn_data(f, max_cols, max_rows, org_data):
     
     return org_data
 
-# Read input data from excel file and a defined worksheet
+# Read learn data from one or multiple Excel files
 def read_xl_learn(files, wsheet, max_rows, max_cols, tag_col, text_col):
 
+    # Get the file list
     file_list = list(glob.glob(files))
     org_data = []    
 
+    # Iterate the list of files
     for f in file_list:
         try:
             rf = open(f, encoding='latin-1')
@@ -381,6 +384,7 @@ def readExclude(filename):
         print("Columns with exclude data:", list(df.columns))
         return df
 
+    # If there is no file return an empty data frame
     except FileNotFoundError:
         print("No exclude file")
         return pd.DataFrame()
