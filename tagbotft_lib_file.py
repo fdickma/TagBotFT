@@ -22,7 +22,7 @@ def convertAmount(amount: str) -> float:
 # Filter input dataframe by a filter dataframe
 def filter_input(in_df, filter_df):
     # Iterate over all columns in the filter dataframe / exclude list
-    if len(filter_df > 0):
+    if len(filter_df) > 0:
         for col in filter_df:
             newData = in_df[~in_df[[col]]\
             .isin(filter_df[col].astype(str).tolist()).any(axis=1)]
@@ -69,7 +69,7 @@ def read_xl_learn_data(f, max_cols, max_rows, org_data):
             print("Reading file: %.0f %%" % round(progress), end='\r', flush=True)
     print(f'\n\rLoaded {line_count} lines.')
     wb.close()
-    
+
     return org_data
 
 # Read learn data from one or multiple Excel files
@@ -96,7 +96,7 @@ def read_xl_learn(files, wsheet, max_rows, max_cols, tag_col, text_col):
     # Setting default colums in dataframe
     dfs = dfs.rename(columns={tag_col: 'Tag', text_col: 'Text'})
 
-    # Ensure consistent column data for columns of string value
+    # Ensure consistent column data for columns of string or date value
     for sheet_col in dfs:
         if dfs[sheet_col].dtypes == object:
             dfs[sheet_col] = dfs[sheet_col].astype(str)
@@ -388,3 +388,37 @@ def readExclude(filename):
     except FileNotFoundError:
         print("No exclude file")
         return pd.DataFrame()
+
+def read_CSV(files: str, max_rows: int, test: bool, exclude_file, work_data):
+
+    # Reading exclude file
+    exclude_df = readExclude(exclude_file)
+
+    tl.message("Loading CSV data files")
+
+    # Get the list of files to process
+    file_list = list(glob.glob(files))
+    
+
+    for f in file_list:
+        try:
+            # Pandas CSV function takes the first line as column name
+            if test is True:
+                df = pd.read_csv(f, delimiter=';', nrows=max_rows)
+            else:
+                df = pd.read_csv(f, delimiter=';')
+        except FileNotFoundError:
+            print('File ' + f + ' not found.')
+    
+    print(len(df),"Entries read...")
+    
+    df['Date'] = pd.to_datetime(df['Date'], format='%d.%m.%Y')
+    df.insert(0,'Tag','')
+
+    # Filtering the the SAP data by the exclude data
+    newData = filter_input(df, exclude_df)
+
+    # Remove uneven string columns
+    newData = tl.maxcol(newData, work_data)
+
+    return newData

@@ -387,8 +387,11 @@ def get_in_df_cols(in_df, learn_df):
 
     # Iterate over the learn data columns
     for ncol in list(learn_df_copy.columns.values):
+        if ncol != "Quality" and ncol != "Edit":
+            vari = in_df_testcopy[ncol].nunique(dropna=True)
         # Only consider columns where the content is not empty
-        if (len(in_df_testcopy[in_df_testcopy[ncol].str.len()>0]) > 0):
+        if (len(in_df_testcopy[in_df_testcopy[ncol].str.len()>0]) > 0)\
+        and vari > 5:
             try:
                 comp_cols.append(ncol)
             except:
@@ -438,6 +441,7 @@ def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
     for a, b in in_df_copy.iterrows():
         # Define empty conditions list
         comparisons = []
+        tmp_comp = []
 
         for head in comp_cols:
             if head == "Tag":
@@ -454,6 +458,7 @@ def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
                                     == check)
             else:
                 comparisons.append(learn_df_copy[head] == b[head])
+            tmp_comp.append(b[head])
 
         # Check if all conditions are met by applying numpy.logical
         test = learn_df_copy.loc[np.logical_and.reduce(comparisons)]
@@ -686,7 +691,7 @@ def tag_relevant(input_df):
             + ' remaining                  ', end="")
 
         # If there is a result
-        if result is not None:
+        if result is not None and type(result) == str:
             # Check if no error has been detected and then assign the Tag
             # and an Edit column indicator
             if error is False:
@@ -804,7 +809,8 @@ def tag_other(input_df):
             # If there is a result
             if result is not None:
                 # Check if no error has been detected and then assign the Tag
-                # and an Edit column indicator
+                # and an Edit column indicator, but only non relevant results
+                # can clearly be defined as good results
                 if result == "not_relevant":
                     input_df.loc[a, "Tag"] = "y"
                     input_df.loc[a, "Edit"] = ""
@@ -820,24 +826,95 @@ def tag_other(input_df):
     return tagged, untagged
 
 # Find similar entries in a given dataframe with Levenshtein distance
-def find_similar(w, df, other_col_list):
-    w = w.upper()
+def find_similar(entry, df, other_col_list):
     quality = 0.0
+    quality_long = 0.0
     result = ''
+    long_entry = ''
     other_result = []
+    other_result_long = []
+    long_test_cols = []
+    
+    for entry_col, value in entry.iteritems():
+        if entry_col != "Quality" and entry_col != "Edit":
+            variability = df[entry_col].nunique(dropna=True) / len(df) * 100
+            if variability > 0.5:
+                if type(value) == str or type(value) == float \
+                or type(value) == int:
+                    entry_data = str(value).replace(' ','')
+                    if len(entry_data) > 1:
+                        long_test_cols.append(entry_col)    
+                        long_entry = long_entry + entry_data
+
+    col_list_long = []
+
+    for col in long_test_cols:
+        # In order to supress colums with less variable content, every column 
+        # with less than 0.5 % of unique elements will not be included
+        variability = df[col].nunique(dropna=True) / len(df) * 100
+        if variability > 0.5:
+            #print(col, round(variability, 5))
+            if df[col].dtypes == object:
+                col_list_long.append(col)
+            if df[col].dtypes == float:
+                col_list_long.append(col)
+            if df[col].dtypes == int:
+                col_list_long.append(col)
+    
+    short_entry = entry["Text"]
+    short_entry = str(short_entry)
+    short_entry = short_entry.replace(' ','')
+    short_check = df[["Text"]].astype(str).copy()
+    short_check = short_check.replace(' ','', regex=True)
+
     # Call the Levenshtein distance calculation function
-    match = difflib.get_close_matches(w, df['Text'].astype(str), 1, 0.25)
+    match = difflib.get_close_matches(short_entry, short_check['Text'], 1, 0.25)
     if len(match) > 0:
         str_match = match[0]
-        s = difflib.SequenceMatcher(None, str_match, w, autojunk=True).ratio()
-        result_df = df[(df['Text'] == str_match)]
+        s = difflib.SequenceMatcher(None, str_match, short_entry, autojunk=True).ratio()
+        result_tmp = short_check[(short_check['Text'] == str_match)]
+        result_idx = short_check.index.get_loc(result_tmp.iloc[0].name)
+        result_df = df.iloc[[result_idx]]
         result = result_df['Tag'].values[0]
         for o_col in other_col_list:
             tmp_row = [o_col]
             tmp_row.append(result_df[o_col].values[0])
             other_result.append(tmp_row)
         quality = float(format(s, '0.02f'))
+
+    # Call the Levenshtein distance calculation function long version
+    # if the short version does not exceed a quality of 95%
+    if quality > 0.95:
+        tmp_df = df.copy()
+        tmp_df = tmp_df.astype(str)
+        tmp_list = tmp_df[col_list_long].agg(''.join, axis=1)
+        long_check = pd.DataFrame(tmp_list, columns = ['Check'])
+        long_check = long_check.replace(' ','', regex=True)
+        match = difflib.get_close_matches(long_entry, long_check['Check'], 1, 0.25)
+    if len(match) > 0 and quality > 0.95:
+        str_match = match[0]
+        s = difflib.SequenceMatcher(None, str_match, long_entry, autojunk=True).ratio()
+        result_tmp = long_check[(long_check['Check'] == str_match)]
+        result_idx = long_check.index.get_loc(result_tmp.iloc[0].name)
+        result_df = df.iloc[[result_idx]]
+        result_long = result_df['Tag'].values[0]
+        for o_col in other_col_list:
+            tmp_row = [o_col]
+            tmp_row.append(result_df[o_col].values[0])
+            other_result_long.append(tmp_row)
+        quality_long = float(format(s, '0.02f'))
+
+    # In case the long version quality exceeds the short version quality
+    # take the long version results
+    if quality_long > quality:
+        result = result_long
+        other_result = other_result_long
+        quality = quality_long
+        # print("\n","Short", quality, result, short_entry, "\t", \
+        #   "Long", quality_long, result_long, long_entry, "\n")
+    
     other_df = pd.DataFrame(other_result, columns=['Col', 'Val'])
+
     return result, quality, other_df
 
 # Assign tags to input data by applying Levenshtein distance
@@ -851,13 +928,13 @@ def lev_tagging(in_df, learn_df, proc_num):
     existing_start = time.time()
     for a, b in in_df.iterrows():
         # Call the Levenshtein distance calculation function
-        result, quality, other_result = find_similar(b.Text, learn_df, other_col_list)
+        result, quality, other_result = find_similar(b, learn_df, other_col_list)
         in_df.loc[a, 'Tag'] = result
         in_df.loc[a, 'Quality'] = quality
         for o_col in other_col_list:
             try:
                 tmp_col = other_result[other_result['Col'] == o_col]
-                tmp_val = tmp_col['Val'].item()
+                tmp_val = tmp_col['Val'].iloc[0]
             except:
                 tmp_val = None
             
@@ -868,7 +945,7 @@ def lev_tagging(in_df, learn_df, proc_num):
                 continue
             else:
                 in_df.loc[a, o_col] = tmp_val
-        
+
         p += 1
         
         # Time difference from start of process to now

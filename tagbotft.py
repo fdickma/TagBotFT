@@ -10,6 +10,7 @@ import sys
 import numpy as np
 import time
 import datetime
+import configparser
 from itertools import repeat
 
 import tagbotft_lib as tl
@@ -66,17 +67,22 @@ if __name__ == '__main__':
     start_time = time.time()
 
     # Setting initial parameters
+    # Set default variables
     org_data = []
-    dbf = "tagbotft.sqlite"
-    org_file = 'learn_data*.xlsx'
-    wsheet = "Komplett"
-    non_relevant_tag = "y"
-    exclude_file = "excludes.lst"
-    tag_col_txt = 'System'
-    text_col_txt = 'Beschreibung'
-    max_cols = 11
+    myDir = os.path.abspath(os.path.dirname(__file__)) + '/'
+    config = configparser.ConfigParser()
+    config.sections()
+    config.read(myDir + 'tagbotft.ini')
+    dbf = config['Settings']['dbf']
+    org_file = config['Settings']['org_file']
+    wsheet = config['Settings']['wsheet']
+    non_relevant_tag = config['Settings']['non_relevant_tag']
+    exclude_file = config['Settings']['exclude_file']
+    tag_col_txt = config['Settings']['tag_col_txt']
+    text_col_txt = config['Settings']['text_col_txt']
+    max_cols = config.getint('Settings','max_cols')
 
-    # Only read the initial data when necessary
+    # Only rebuild data when the parameter is set
     if args.rebuild:
         # Reading data from Excel file
         work_data = tf.read_xl_learn(org_file, wsheet, max_lines, max_cols, \
@@ -87,7 +93,8 @@ if __name__ == '__main__':
     work_data = td.read_learn_db()
     
     # Read the SAP data into one list
-    newData = tf.read_SAP_1('*.TXT', max_input, test, exclude_file, work_data)
+    # newData = tf.read_SAP_1('*.TXT', max_input, test, exclude_file, work_data)
+    newData = tf.read_CSV('*.csv', max_input, test, exclude_file, work_data)
 
     # Generate a dataframe from working data
     learn_df = tl.get_df(work_data, non_relevant_tag)
@@ -113,20 +120,20 @@ if __name__ == '__main__':
     # Writing existing entries to Excel file
     tf.writeXLS('result_data_old.xlsx', old_df, tag_col_txt, text_col_txt)
 
-    # Stage 1 - tagging the not relevant data first
+    # Stage: tagging the not relevant data first
     tagged_non_relevant, untagged = tl.tag_non_relevant(new_df)
 
-    # Stage 2 - tagging relevant data from other than text column
-    tagged_other, untagged = tl.tag_other(untagged)
+    # Stage: tagging relevant data from other than text column
+    #tagged_other, untagged = tl.tag_other(untagged)
 
-    # Stage 3 - tagging relevant data with unique Ngrams 
+    # Stage: tagging relevant data with unique Ngrams 
     tagged_relevant, untagged = tl.tag_relevant(untagged)
 
-    # Stage 4 - tagging relevant data by Levenshtein distance analysis
+    # Stage: tagging relevant data by Levenshtein distance analysis
     tagged_similar = tl.tag_lev_df(untagged, work_data, cores, max_lines)
 
-    # Concatenating results from the four stages
-    tagged = pd.concat([tagged_non_relevant, tagged_other])
+    # Concatenating results from the stages
+    tagged = tagged_non_relevant
     tagged = pd.concat([tagged, tagged_relevant])
     tagged = pd.concat([tagged, tagged_similar])
 
@@ -135,5 +142,7 @@ if __name__ == '__main__':
     # Writing tagging results to Excel file
     tf.writeXLS('result_data.xlsx', tagged, tag_col_txt, text_col_txt)
 
+    # End of TagBotFT
+    tl.message('TagBotFT has finished')
     print('Execution took {} (h:min:s, wall clock time).' \
         .format(datetime.timedelta(seconds=round(time.time() - start_time))))
