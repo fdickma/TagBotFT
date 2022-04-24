@@ -80,6 +80,7 @@ if __name__ == '__main__':
     exclude_file = config['Settings']['exclude_file']
     tag_col_txt = config['Settings']['tag_col_txt']
     text_col_txt = config['Settings']['text_col_txt']
+    input_files = config['Settings']['input_files']
     max_cols = config.getint('Settings','max_cols')
 
     # Only rebuild data when the parameter is set
@@ -92,9 +93,13 @@ if __name__ == '__main__':
     # Reading the data from database ensures clear column formats
     work_data = td.read_learn_db()
     
-    # Read the SAP data into one list
-    # newData = tf.read_SAP_1('*.TXT', max_input, test, exclude_file, work_data)
-    newData = tf.read_CSV('*.csv', max_input, test, exclude_file, work_data)
+    # Read the input data into dataframe
+    if input_files[-3:] == "TXT":
+        newData = tf.read_SAP_1(input_files, max_input, test, exclude_file, work_data)
+    elif input_files[-3:] == "csv":
+        newData = tf.read_CSV(input_files, max_input, test, exclude_file, work_data)
+    else:
+        exit()
 
     # Generate a dataframe from working data
     learn_df = tl.get_df(work_data, non_relevant_tag)

@@ -366,6 +366,10 @@ def writeXLS(filename_w, results, tag_col, text_col):
     # Add Autofilter
     sheet.auto_filter.ref = "A1:BA" + str(i)
 
+    # Set auto adjusted column widths
+    for idx, col in enumerate(sheet.columns, 1):
+        sheet.column_dimensions[get_column_letter(idx)].auto_size = True
+
     # Fixate the top row
     c = sheet['A2']
     sheet.freeze_panes = c
@@ -404,9 +408,9 @@ def read_CSV(files: str, max_rows: int, test: bool, exclude_file, work_data):
         try:
             # Pandas CSV function takes the first line as column name
             if test is True:
-                df = pd.read_csv(f, delimiter=';', nrows=max_rows)
+                df = pd.read_csv(f, delimiter=';', nrows=max_rows, decimal=",")
             else:
-                df = pd.read_csv(f, delimiter=';')
+                df = pd.read_csv(f, delimiter=';', decimal=",")
         except FileNotFoundError:
             print('File ' + f + ' not found.')
     
