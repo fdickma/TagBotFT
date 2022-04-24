@@ -388,7 +388,7 @@ def get_in_df_cols(in_df, learn_df):
     # Iterate over the learn data columns
     for ncol in list(learn_df_copy.columns.values):
         if ncol != "Quality" and ncol != "Edit":
-            vari = in_df_testcopy[ncol].nunique(dropna=True)
+            vari = learn_df_copy[ncol].nunique(dropna=True)
         # Only consider columns where the content is not empty
         if (len(in_df_testcopy[in_df_testcopy[ncol].str.len()>0]) > 0)\
         and vari > 5:
@@ -415,8 +415,8 @@ def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
     total_count = len(in_df)
 
     in_df_copy = in_df.copy()
-    in_df_testcopy = in_df.copy()
-    in_df_testcopy = in_df_testcopy.astype(str)
+    #in_df_testcopy = in_df.copy()
+    #in_df_testcopy = in_df_testcopy.applymap(str)
     learn_df_copy = learn_df.copy()
 
     for col in in_df_copy.columns:
@@ -462,7 +462,7 @@ def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
 
         # Check if all conditions are met by applying numpy.logical
         test = learn_df_copy.loc[np.logical_and.reduce(comparisons)]
-
+        
         if len(test) > 0:
             # Check if there is not a unique tag available
             if len(test.groupby(['Tag'])) != 1:
