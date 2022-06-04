@@ -1,8 +1,0 @@
-.vscode/
-.idea/
-logs
-*.log
-tagbotft*.ini
-*.sqlite
-result_data*.*
-__pycache__/
