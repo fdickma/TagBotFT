@@ -92,7 +92,7 @@ if __name__ == '__main__':
         
     # Reading the data from database ensures clear column formats
     work_data = td.read_learn_db()
-    
+
     # Read the input data into dataframe
     if input_files[-3:] == "TXT":
         newData = tf.read_SAP_1(input_files, max_input, test, exclude_file, work_data)

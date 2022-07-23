@@ -34,7 +34,7 @@ def write_other_cols_db(df):
             detect_types=sqlite3.PARSE_DECLTYPES)
     df.to_sql('other_Col_Values', conn, if_exists='replace', index=False)
 
-# Write the other columns to an SQLite database
+# Read other columns from SQLite database
 def read_other_cols_db():
     # Open database connection
     conn = sqlite3.connect('tagbotft.sqlite', \
