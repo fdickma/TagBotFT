@@ -4,6 +4,7 @@ import time
 import datetime
 import pandas as pd
 import numpy as np
+import __main__
 
 import tagbotft_lib as tl
 
@@ -31,14 +32,13 @@ def filter_input(in_df, filter_df):
         return in_df
 
 # Read learn data from an Excel file
-def read_xl_learn_data(f, max_cols, max_rows, org_data):
+def read_xl_learn_data(f, max_rows, org_data):
 
     from openpyxl import load_workbook
 
     # Loading data file with a maximum number of lines
     tl.message("Reading Excel data sheet: " + f)
     wb = load_workbook(f, data_only=True, read_only=True)
-    # sheet = wb[wsheet]
     sheet = wb.active
     
     # Get the real maximum of lines to read
@@ -52,7 +52,7 @@ def read_xl_learn_data(f, max_cols, max_rows, org_data):
         wsrow = []
         col_i = 0
         for cell in row:
-            if col_i < max_cols:
+            if col_i < __main__.max_cols:
                 wsrow.append(cell.value)
                 col_i += 1
         if line_count > max_rows:
@@ -73,7 +73,7 @@ def read_xl_learn_data(f, max_cols, max_rows, org_data):
     return org_data
 
 # Read learn data from one or multiple Excel files
-def read_xl_learn(files, wsheet, max_rows, max_cols, tag_col, text_col):
+def read_xl_learn(files, max_rows):
 
     # Get the file list
     file_list = list(glob.glob(files))
@@ -86,7 +86,7 @@ def read_xl_learn(files, wsheet, max_rows, max_cols, tag_col, text_col):
         except FileNotFoundError:
             print('File ' + f + ' not found.')
         else:
-            org_data = read_xl_learn_data(f, max_cols, max_rows, org_data)
+            org_data = read_xl_learn_data(f, max_rows, org_data)
 
     print("\n\rHeaders:", org_data[0])
 
@@ -94,7 +94,8 @@ def read_xl_learn(files, wsheet, max_rows, max_cols, tag_col, text_col):
     dfs = pd.DataFrame(data=org_data[1:], columns=org_data[0])
 
     # Setting default colums in dataframe
-    dfs = dfs.rename(columns={tag_col: 'Tag', text_col: 'Text'})
+    dfs = dfs.rename(columns={__main__.tag_col: 'Tag', \
+        __main__.text_col: 'Text'})
 
     # Ensure consistent column data for columns of string or date value
     for sheet_col in dfs:
@@ -117,7 +118,7 @@ def writeLog(logEvent):
 # Dickmann / Birkenkamp
 # Read SAP data files with RegEx to identify relevant data lines and items
 # Input files can come from Kosten, GWGs oder Anlagen
-def read_SAP_1(files: str, test_len: int, test: bool, exclude_file, work_data):
+def read_SAP_1(files: str, test_len: int, exclude_file, work_data):
 
     # Reading exclude file
     exclude_df = readExclude(exclude_file)
@@ -279,7 +280,7 @@ def read_SAP_1(files: str, test_len: int, test: bool, exclude_file, work_data):
                     str(totalLineCounter) + " lines from " + str(f))
     
     # Just get a limited number of items in test mode
-    SAPinput = SAPinput[:test_len] if test else SAPinput    
+    SAPinput = SAPinput[:test_len] if __main__.test else SAPinput    
     
     #print(SAPinput)
     # Generate a dataframe from input
@@ -314,7 +315,7 @@ def color_row(sheet, cell_range, color):
             c.fill = fill
 
 # Writing the results to an Excel file
-def writeXLS(filename_w, results, tag_col, text_col):
+def writeXLS(filename_w, results):
     from openpyxl import Workbook
     from openpyxl.utils import get_column_letter
     from openpyxl.styles import NamedStyle
@@ -328,10 +329,10 @@ def writeXLS(filename_w, results, tag_col, text_col):
         if results[col_name].dtype == 'datetime64[ns]':
             sheet.column_dimensions[get_column_letter(a)].width = 10
         if col_name == "Tag":
-            col_name = tag_col
+            col_name = __main__.tag_col
             sheet.column_dimensions[get_column_letter(a)].width = 12
         if col_name == "Text":
-            col_name = text_col
+            col_name = __main__.text_col
             sheet.column_dimensions[get_column_letter(a)].width = 60
         sheet.cell(row=1, column=a).value = col_name
         sheet.cell(row=1, column=a).font = Font(name='Arial', size=10)
@@ -393,7 +394,7 @@ def readExclude(filename):
         print("No exclude file")
         return pd.DataFrame()
 
-def read_CSV(files: str, max_rows: int, test: bool, exclude_file, work_data):
+def read_CSV(files: str, max_rows: int, exclude_file, work_data):
 
     # Reading exclude file
     exclude_df = readExclude(exclude_file)
@@ -407,7 +408,7 @@ def read_CSV(files: str, max_rows: int, test: bool, exclude_file, work_data):
     for f in file_list:
         try:
             # Pandas CSV function takes the first line as column name
-            if test is True:
+            if __main__.test is True:
                 df = pd.read_csv(f, delimiter=';', nrows=max_rows, decimal=",")
             else:
                 df = pd.read_csv(f, delimiter=';', decimal=",")
