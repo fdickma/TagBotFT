@@ -11,6 +11,7 @@ from itertools import repeat
 # partial partitions data for the Pool version of tagging on Windows
 from functools import partial
 from difflib import SequenceMatcher
+import __main__
 
 import tagbotft_lib_file as tf
 import tagbotft_lib_db as td
@@ -517,7 +518,7 @@ def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
     # Return the existing and not existing data
     return found_df, not_found_df
 
-def get_existing(newData, work_data, cores, max_lines):
+def get_existing(newData, work_data, max_lines):
 
     message("Identifying existing data")
 
@@ -528,18 +529,18 @@ def get_existing(newData, work_data, cores, max_lines):
     comp_cols, excl_cols = get_in_df_cols(newData, work_data)
 
     # One process gets all data
-    if cores < 2:
+    if __main__.cores < 2:
         # One process means all data for that process and one process only
         found_df, not_found_df = get_existing_proc(newData, work_data)
         
     # multiple processes require data partitioned 
     else:
         # Define a list of processes form a range
-        proc_num = [*range(1, cores + 1)]
+        proc_num = [*range(1, __main__.cores + 1)]
         
-        part_ngrams = np.array_split(newData, cores)
+        part_ngrams = np.array_split(newData, __main__.cores)
 
-        pool = mp.Pool(processes=cores)
+        pool = mp.Pool(processes = __main__.cores)
     
         # Define the processing queues with function to call and data together
         # with process number
@@ -967,26 +968,26 @@ def lev_tagging(in_df, learn_df, proc_num):
     return in_df
 
 # Main tagging function with Levenshtein distance
-def tag_lev_df(in_df, learn_df, cores, max_lines):
+def tag_lev_df(in_df, learn_df, max_lines):
 
     message('Tagging similar data with Levenshtein distance')
     
     # Building test data, the data to tagged
     # One process gets all data
-    if cores < 2:
+    if __main__.cores < 2:
         # One process means all data for that process and one process only
         tag_data = lev_tagging(in_df.copy(), learn_df, 1)
         
     # multiple processes need the data to be separated
     else:
-        tag_data = np.array_split(in_df.copy(), cores)
+        tag_data = np.array_split(in_df.copy(), __main__.cores)
 
         # Define a list of processes form a range
-        proc_num = [*range(1, cores + 1)]
+        proc_num = [*range(1, __main__.cores + 1)]
     
         # Run tagging as Pool parallel processes; indata and tags are fixed input
         #partial_lev_tagging = partial(lev_tagging, ldata=learn_df)
-        pool = mp.Pool(processes=cores)
+        pool = mp.Pool(processes = __main__.cores)
     
         # Define the processing queues with function to call and data together
         #with process number

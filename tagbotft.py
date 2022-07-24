@@ -39,6 +39,9 @@ if __name__ == '__main__':
         '-n', '--newlearn', help='Process learning data', action='store_true')
     parser.add_argument(
         '-r', '--rebuild', help='Reload learning data', action='store_true')
+    parser.add_argument(
+        '--inifile', default='tagbotft.ini', type=str,
+        dest='inifile', help='Different INI file')
     args = parser.parse_args()
     
     # Test run limits the amounts of input data
@@ -66,28 +69,32 @@ if __name__ == '__main__':
     # Get the start time
     start_time = time.time()
 
+    # Use a different INI file
+    if args.inifile:
+        ini_file = args.inifile
+
     # Setting initial parameters
     # Set default variables
     org_data = []
     myDir = os.path.abspath(os.path.dirname(__file__)) + '/'
     config = configparser.ConfigParser()
     config.sections()
-    config.read(myDir + 'tagbotft.ini')
+    config.read(myDir + ini_file)
     dbf = config['Settings']['dbf']
+    dbl = config['Settings']['dbl']
     org_file = config['Settings']['org_file']
     wsheet = config['Settings']['wsheet']
     non_relevant_tag = config['Settings']['non_relevant_tag']
     exclude_file = config['Settings']['exclude_file']
-    tag_col_txt = config['Settings']['tag_col_txt']
-    text_col_txt = config['Settings']['text_col_txt']
+    tag_col = config['Settings']['tag_col_txt']
+    text_col = config['Settings']['text_col_txt']
     input_files = config['Settings']['input_files']
     max_cols = config.getint('Settings','max_cols')
 
     # Only rebuild data when the parameter is set
     if args.rebuild:
         # Reading data from Excel file
-        work_data = tf.read_xl_learn(org_file, wsheet, max_lines, max_cols, \
-                                tag_col_txt, text_col_txt)
+        work_data = tf.read_xl_learn(org_file, max_lines)
         td.write_learn_db(work_data)
         
     # Reading the data from database ensures clear column formats
@@ -95,9 +102,9 @@ if __name__ == '__main__':
 
     # Read the input data into dataframe
     if input_files[-3:] == "TXT":
-        newData = tf.read_SAP_1(input_files, max_input, test, exclude_file, work_data)
+        newData = tf.read_SAP_1(input_files, max_input, exclude_file, work_data)
     elif input_files[-3:] == "csv":
-        newData = tf.read_CSV(input_files, max_input, test, exclude_file, work_data)
+        newData = tf.read_CSV(input_files, max_input, exclude_file, work_data)
     else:
         exit()
 
@@ -120,10 +127,10 @@ if __name__ == '__main__':
 
     # Divide the new data into existing and new entries
     # Only new entries will be further processed after this step
-    old_df, new_df = tl.get_existing(newData, work_data, cores, max_lines)
+    old_df, new_df = tl.get_existing(newData, work_data, max_lines)
    
     # Writing existing entries to Excel file
-    tf.writeXLS('result_data_old.xlsx', old_df, tag_col_txt, text_col_txt)
+    tf.writeXLS('result_data_old.xlsx', old_df)
 
     # Stage: tagging the not relevant data first
     tagged_non_relevant, untagged = tl.tag_non_relevant(new_df)
@@ -135,7 +142,7 @@ if __name__ == '__main__':
     tagged_relevant, untagged = tl.tag_relevant(untagged)
 
     # Stage: tagging relevant data by Levenshtein distance analysis
-    tagged_similar = tl.tag_lev_df(untagged, work_data, cores, max_lines)
+    tagged_similar = tl.tag_lev_df(untagged, work_data, max_lines)
 
     # Concatenating results from the stages
     tagged = tagged_non_relevant
