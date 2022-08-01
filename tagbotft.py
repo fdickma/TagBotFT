@@ -94,7 +94,7 @@ if __name__ == '__main__':
     # Only rebuild data when the parameter is set
     if args.rebuild:
         # Reading data from Excel file
-        work_data = tf.read_xl_learn(org_file, max_lines)
+        work_data = tf.read_xl_learn(org_file)
         td.write_learn_db(work_data)
         
     # Reading the data from database ensures clear column formats
@@ -102,9 +102,9 @@ if __name__ == '__main__':
 
     # Read the input data into dataframe
     if input_files[-3:] == "TXT":
-        newData = tf.read_SAP_1(input_files, max_input, exclude_file, work_data)
+        newData = tf.read_SAP_1(input_files, exclude_file, work_data)
     elif input_files[-3:] == "csv":
-        newData = tf.read_CSV(input_files, max_input, exclude_file, work_data)
+        newData = tf.read_CSV(input_files, exclude_file, work_data)
     else:
         exit()
 
@@ -127,7 +127,7 @@ if __name__ == '__main__':
 
     # Divide the new data into existing and new entries
     # Only new entries will be further processed after this step
-    old_df, new_df = tl.get_existing(newData, work_data, max_lines)
+    old_df, new_df = tl.get_existing(newData, work_data)
    
     # Writing existing entries to Excel file
     tf.writeXLS('result_data_old.xlsx', old_df)
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     tagged_relevant, untagged = tl.tag_relevant(untagged)
 
     # Stage: tagging relevant data by Levenshtein distance analysis
-    tagged_similar = tl.tag_lev_df(untagged, work_data, max_lines)
+    tagged_similar = tl.tag_lev_df(untagged, work_data)
 
     # Concatenating results from the stages
     tagged = tagged_non_relevant
@@ -152,7 +152,7 @@ if __name__ == '__main__':
     print('Tagged data: ' + str(len(tagged)))
 
     # Writing tagging results to Excel file
-    tf.writeXLS('result_data.xlsx', tagged, tag_col_txt, text_col_txt)
+    tf.writeXLS('result_data.xlsx', tagged)
 
     # End of TagBotFT
     tl.message('TagBotFT has finished')

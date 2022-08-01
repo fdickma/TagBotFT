@@ -32,7 +32,7 @@ def filter_input(in_df, filter_df):
         return in_df
 
 # Read learn data from an Excel file
-def read_xl_learn_data(f, max_rows, org_data):
+def read_xl_learn_data(f, org_data):
 
     from openpyxl import load_workbook
 
@@ -42,8 +42,8 @@ def read_xl_learn_data(f, max_rows, org_data):
     sheet = wb.active
     
     # Get the real maximum of lines to read
-    if sheet.max_row < max_rows:
-        max_rows = sheet.max_row
+    if sheet.max_row < __main__.max_lines:
+         rows = sheet.max_row
     
     # Start with no lines read
     line_count = 0
@@ -55,7 +55,7 @@ def read_xl_learn_data(f, max_rows, org_data):
             if col_i < __main__.max_cols:
                 wsrow.append(cell.value)
                 col_i += 1
-        if line_count > max_rows:
+        if line_count > __main__.max_lines:
             break
         # Skip if a header row has been already read
         if (len(org_data) > 0) and (line_count == 0):
@@ -64,7 +64,7 @@ def read_xl_learn_data(f, max_rows, org_data):
         else:
             org_data.append(wsrow)
             # Calculating the progress as percentage
-            progress = line_count / max_rows * 100
+            progress = line_count / __main__.max_lines * 100
             line_count += 1
             print("Reading file: %.0f %%" % round(progress), end='\r', flush=True)
     print(f'\n\rLoaded {line_count} lines.')
@@ -73,7 +73,7 @@ def read_xl_learn_data(f, max_rows, org_data):
     return org_data
 
 # Read learn data from one or multiple Excel files
-def read_xl_learn(files, max_rows):
+def read_xl_learn(files):
 
     # Get the file list
     file_list = list(glob.glob(files))
@@ -86,7 +86,7 @@ def read_xl_learn(files, max_rows):
         except FileNotFoundError:
             print('File ' + f + ' not found.')
         else:
-            org_data = read_xl_learn_data(f, max_rows, org_data)
+            org_data = read_xl_learn_data(f, org_data)
 
     print("\n\rHeaders:", org_data[0])
 
@@ -118,7 +118,7 @@ def writeLog(logEvent):
 # Dickmann / Birkenkamp
 # Read SAP data files with RegEx to identify relevant data lines and items
 # Input files can come from Kosten, GWGs oder Anlagen
-def read_SAP_1(files: str, test_len: int, exclude_file, work_data):
+def read_SAP_1(files: str, exclude_file, work_data):
 
     # Reading exclude file
     exclude_df = readExclude(exclude_file)
@@ -280,7 +280,7 @@ def read_SAP_1(files: str, test_len: int, exclude_file, work_data):
                     str(totalLineCounter) + " lines from " + str(f))
     
     # Just get a limited number of items in test mode
-    SAPinput = SAPinput[:test_len] if __main__.test else SAPinput    
+    SAPinput = SAPinput[:__main__.max_input] if __main__.test else SAPinput    
     
     #print(SAPinput)
     # Generate a dataframe from input
@@ -394,7 +394,7 @@ def readExclude(filename):
         print("No exclude file")
         return pd.DataFrame()
 
-def read_CSV(files: str, max_rows: int, exclude_file, work_data):
+def read_CSV(files: str, exclude_file, work_data):
 
     # Reading exclude file
     exclude_df = readExclude(exclude_file)
@@ -409,7 +409,7 @@ def read_CSV(files: str, max_rows: int, exclude_file, work_data):
         try:
             # Pandas CSV function takes the first line as column name
             if __main__.test is True:
-                df = pd.read_csv(f, delimiter=';', nrows=max_rows, decimal=",")
+                df = pd.read_csv(f, delimiter=';', nrows=__main__.max_lines, decimal=",")
             else:
                 df = pd.read_csv(f, delimiter=';', decimal=",")
         except FileNotFoundError:

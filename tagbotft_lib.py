@@ -69,7 +69,7 @@ def get_ngrams_df(df):
     return exploded_df.replace(to_replace='None', value=np.nan).dropna()
 
 # Count occurences of tags    
-def count_df(df_ngrams, max_lines):
+def count_df(df_ngrams):
     
     length = len(df_ngrams.index)
     p = 0
@@ -94,13 +94,13 @@ def count_df(df_ngrams, max_lines):
                   end="", flush=True)
         
         # If a maximum of lines is given, don't overstep that boundary
-        if i > max_lines:
+        if i > __main__.max_lines:
             break
 
     return df_ngram_all
 
 # Clean the Ngrams
-def clean_ngrams_df(ngrams_df, df, max_lines):
+def clean_ngrams_df(ngrams_df, df):
     # Delete all Ngrams with only one character
     ngrams_df = ngrams_df[ngrams_df['Ngram'].map(len) > 1]
     
@@ -124,7 +124,7 @@ def clean_ngrams_df(ngrams_df, df, max_lines):
     return df_ngram_uni
 
 # Discard Ngrams which are not good identifiers for tags
-def discard_df(ngrams_uni_df, df, max_lines):
+def discard_df(ngrams_uni_df, df):
     # Copy DataFrame without escape characters and add the columns Test and 
     # Check where Test contains the relevant or non_relevant result and Check
     # the string leading to the Test result
@@ -162,7 +162,7 @@ def discard_df(ngrams_uni_df, df, max_lines):
             l += 1    
 
         # If a maximum of lines is given, don't overstep that boundary
-        if l > (max_lines):
+        if l > __main__.max_lines:
             break
 
     return unique_tags
@@ -518,7 +518,7 @@ def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
     # Return the existing and not existing data
     return found_df, not_found_df
 
-def get_existing(newData, work_data, max_lines):
+def get_existing(newData, work_data):
 
     message("Identifying existing data")
 
@@ -568,7 +568,7 @@ def get_existing(newData, work_data, max_lines):
     # Return the existing and not existing data
     return found_df, not_found_df
 
-def count_tags_df(df_ngrams, max_lines):
+def count_tags_df(df_ngrams):
     
     length = len(df_ngrams.index)
     p = 0
@@ -589,7 +589,7 @@ def count_tags_df(df_ngrams, max_lines):
             progress_old = progress
             print('\rCount progress: ' + str(progress) + str(' % '), \
                   end="", flush=True)
-        if i > max_lines:
+        if i > __main__.max_lines:
             break
     return df_ngram_all
 
@@ -968,7 +968,7 @@ def lev_tagging(in_df, learn_df, proc_num):
     return in_df
 
 # Main tagging function with Levenshtein distance
-def tag_lev_df(in_df, learn_df, max_lines):
+def tag_lev_df(in_df, learn_df):
 
     message('Tagging similar data with Levenshtein distance')
     
