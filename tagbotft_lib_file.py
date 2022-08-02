@@ -293,10 +293,14 @@ def read_SAP_1(files: str, exclude_file, work_data):
     df = df.replace(r"^None$", '', regex=True)
 
     # Filtering the the SAP data by the exclude data
-    newData = filter_input(df, exclude_df)
+    if len(exclude_df) > 1:
+        newData = filter_input(df, exclude_df)
+    else:
+        newData = df 
 
     # Remove uneven string columns
-    newData = tl.maxcol(newData, work_data)
+    if len(work_data) > 1:
+        newData = tl.maxcol(newData, work_data)
 
     return newData
 
