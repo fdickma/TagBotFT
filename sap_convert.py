@@ -23,9 +23,18 @@ if __name__ == '__main__':
 
     tl.message('\nStarting SAP data conversion\n')
 
+    # Setting initial parameters
+    # Set default variables
+    ini_file = 'sap_convert.ini'
     test = False
-    tag_col = 'System'
-    text_col = 'Beschreibung'
+    myDir = os.path.abspath(os.path.dirname(__file__)) + '/'
+    config = configparser.ConfigParser()
+    config.sections()
+    config.read(myDir + ini_file)
+    tag_col = config['Settings']['tag_col_txt']
+    text_col = config['Settings']['text_col_txt']
+    input_files = config['Settings']['input_files']
+    max_cols = config.getint('Settings','max_cols')
 
     # Read the input data into dataframe
     convData = tf.read_SAP_1("*.TXT", '', '')
