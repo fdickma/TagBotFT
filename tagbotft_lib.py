@@ -453,7 +453,7 @@ def get_existing_proc(in_df, learn_df, comp_cols, excl_cols):
             # In case of string comparison apply uppercase on the dataframe
             # and the comparing string
             col_type = learn_df_copy[head].dtype
-            if col_type == np.object:
+            if col_type == object:
                 check = b[head].upper()
                 comparisons.append(learn_df_copy[head].str.upper() \
                                     == check)
@@ -1025,7 +1025,7 @@ def tag_to_other(other_cols, learn_df, newData):
     for o_col in other_cols:
 
         # Only check further if it is a string column
-        if newData.dtypes[o_col] == np.object:
+        if newData.dtypes[o_col] == object:
             # Get the number of empty strings in that column
             count_empty = newData[o_col].str.match("").sum()
             # Get the number of null values in that column
