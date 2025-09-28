@@ -12,6 +12,7 @@ import pandas as pd
 import re
 import multiprocessing as mp
 from itertools import repeat
+from difflib import SequenceMatcher
 import tagbotft2_data as td
 import __main__
 
@@ -433,6 +434,102 @@ def get_wrong_probabilities(probability_df):
 def unique_probabilities(probability_df):
     return probability_df.drop_duplicates(subset=['word', 'tag_col'], keep=False)
 
+# Process a wordlist against trained data from a Dataframe
+def calculate_similarity(word_list):
+
+    # Create data for the DataFrame
+    tags = []
+    cols = []
+    words = []
+    similarity = []
+
+    # Create a dictionary with the columns and their corresponding values
+    similar_dict = {
+        'tag': tags,
+        'tag_col': cols,
+        'word': words,
+        'similarity': similarity
+    }
+    similar_df = pd.DataFrame(similar_dict)
+
+    # In case the word_list is empty, return an empty Dataframe
+    if len(word_list) < 1:
+        return similar_df
+
+    # Iterate over the word_list
+    for word in word_list:
+        # Iterate over the trained data from a Dataframe
+        for index, df_word in __main__.unique_probability_df.iterrows():
+            
+            # Make sure both variables are strings
+            str_df_word = str(df_word['word'])
+            str_word = str(word)
+
+            # Compare the length of both variables
+            length_comp = len(str_df_word) / len(str_word)
+
+            # Initialize similarity to 0
+            s = 0
+
+            # Only process in case the comparison is between 95% and 105% and both
+            # variables are at least 5 characters long.
+            # In that way to short and not similar results are takin into account.
+            if length_comp > 0.95 and length_comp < 1.05 and \
+            len(str_word) > 4 and len(str_df_word) > 4:
+
+                # Calculate a Levenshtein distance for both variables as ratio
+                s = SequenceMatcher(None, str_df_word, str_word, autojunk=True).ratio()
+            
+            # Only append if the Levenshtein distance ratio is greate than 0.3
+            if s > 0.3:
+                similar_df.loc[len(similar_df)] = {
+                    'tag': df_word['tag'],
+                    'tag_col': df_word['tag_col'],
+                    'word': df_word['word'],
+                    'similarity': s
+                }
+
+    # Return the complete Dataframe with all similarities
+    return similar_df
+
+# Function to get the most similar word from a Dataframe column 
+def get_most_similar(word_list, tag_count):
+
+    # One process gets all data
+    if __main__.cores < 2:
+        # One process means all data for that process and one process only
+        processed_data = calculate_similarity(word_list)
+
+    else:
+        # Split the list of words into equal chunks according to the number 
+        # of CPU cores available        
+        chunks = np.array_split(word_list, __main__.cores)
+    
+        # Run tagging as Pool parallel processes;
+        pool = mp.Pool(processes = __main__.cores)
+    
+        # Define the processing queues with function to call and data together
+        pqueue = pool.starmap(calculate_similarity, zip(chunks))
+        pool.close()
+        pool.join()
+    
+        # Iterate the Pool segments for results to build the complete results
+        for q in pqueue:
+            try:
+                processed_data = pd.concat([processed_data, q], ignore_index=True)
+            except:
+                processed_data = q
+
+    processed_data = processed_data.sort_values(by=['similarity', 'word'], \
+                ascending=False)
+
+    # Enable for debugging
+    #processed_data.to_csv("zz_"+word_list[0]+".csv")
+
+    # Return the the most similar result
+    processed_data = processed_data.head(tag_count)
+    return processed_data
+
 # Process Dataframe with new data
 def process_new_data(new_data_df, tag_count):
     
@@ -501,6 +598,7 @@ def process_new_data(new_data_df, tag_count):
         filtered_len = len(filtered_df)
         tag_quality = 100
 
+        # If there are no results examine trained words with multiple options
         if filtered_len == 0:
             filtered_df = __main__.multi_probability_df[\
                 __main__.multi_probability_df['word'].isin(list_words)].copy()
@@ -508,6 +606,13 @@ def process_new_data(new_data_df, tag_count):
                 ascending=False)
             filtered_len = len(filtered_df)
             tag_quality = filtered_df['probability'].values[:1]
+
+        # If there are still no results, test for options within the list of 
+        # unique words
+        if filtered_len == 0:
+            filtered_df = get_most_similar(list_words, tag_count)
+            tag_quality = filtered_df['similarity'].values[:1] * 100
+            filtered_len = len(filtered_df)
 
         # Append the new data to the temporary Dataframe
         temp_new_data.loc[index] = new_data_df.loc[index]
