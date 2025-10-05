@@ -69,10 +69,10 @@ def file_read(file_path):
             # If max lines is set, read only the number of max lines from the file
             if f[-5:] == '.xlsx':
                 if __main__.max_lines > 0:
-                    read_df = pd.read_excel(f, nrows=__main__.max_lines)
+                    read_df = pd.read_excel(f, nrows=__main__.max_lines, dtype=str)
                 # Otherwise load the complete file
                 else:
-                    read_df = pd.read_excel(f)
+                    read_df = pd.read_excel(f, dtype=str)
 
             if len(read_df) > 0:
                 try:
@@ -83,7 +83,13 @@ def file_read(file_path):
         except FileNotFoundError:
             print('File ' + f + ' not found.')
     
-    return file_data
+    try:
+        file_data = file_data.drop(columns=['TB_edit', 'TB_qual'])
+    except:
+        file_data = file_data
+        
+    print("Input records:\t\t", len(file_data))
+    return file_data.astype(str)
 
 # Check database if a certain table exists
 def check_table(database_name, table_name):
@@ -122,7 +128,7 @@ def color_row(sheet, cell_range, color):
             c.fill = fill
 
 # Writing the results to an Excel file
-def write_results(result_data):
+def write_results(result_data, file_name):
     from openpyxl import Workbook
     from openpyxl.utils import get_column_letter
     from openpyxl.styles import NamedStyle
@@ -131,11 +137,21 @@ def write_results(result_data):
     wb = Workbook()
     sheet = wb.active
     
+    # Insert an editable column for manual processing of the results
+    try:
+        result_data.insert(len(result_data.columns)-1,'TB_edit', \
+        ['y' for i in range(result_data.shape[0])])
+    except:
+        pass
+
     a = 1            
     for col_name in result_data.columns:
-        sheet.column_dimensions[get_column_letter(a)].width = \
+        if col_name == "TB_edit":
+            sheet.column_dimensions[get_column_letter(a)].width = 8
+        else:
+            sheet.column_dimensions[get_column_letter(a)].width = \
             result_data[col_name].astype(str).str.len().max()
-        if col_name == "TB_qual":
+        if col_name == "TB_qual" or col_name == "TB_edit":
             sheet.column_dimensions[get_column_letter(a)].width = 12
             quality_col = get_column_letter(a)
         sheet.cell(row=1, column=a).value = col_name
@@ -178,12 +194,14 @@ def write_results(result_data):
     # Set auto adjusted column widths
     for idx, col in enumerate(sheet.columns, 1):
         sheet.column_dimensions[get_column_letter(idx)].auto_size = True
+        if sheet.column_dimensions[get_column_letter(idx)].width < 8:
+            sheet.column_dimensions[get_column_letter(idx)].width = 8
 
     # Fixate the top row
     c = sheet['A2']
     sheet.freeze_panes = c
 
     # Don't forget to save the file
-    wb.save(filename = "results.xlsx")
+    wb.save(filename = file_name)
     print("Results written:\t", i - 2)
     return None

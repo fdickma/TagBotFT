@@ -72,6 +72,9 @@ def initial_split(split_df, proc_num, tag_cols):
     # Initialize an empty Dataframe to store processed data
     processed_data = pd.DataFrame(data_dict)
    
+    # Set inistial start time
+    existing_start = time.time()
+
     # Align the printout of the process number to equal length
     proc_digits = 3 - len(str(proc_num))
     proc_string = " " * proc_digits + str(proc_num)
@@ -149,26 +152,36 @@ def initial_split(split_df, proc_num, tag_cols):
                     processed_data = pd.concat([processed_data, temp_df], ignore_index=True)
 
             # Print progress
-            if __main__.args.progress:
-                # Calculate progress and progress bar
-                progress = int(round(progress_count / progress_max * 100, 0))
-                bars = int(round(progress / 10, 0))
-                spaces = 10 - bars
+            # Calculate progress and progress bar
+            progress = int(round(progress_count / progress_max * 100, 0))
+            bars = int(round(progress / 10, 0))
+            spaces = 10 - bars
 
-                # Only print when update limit is exceeded
-                if progress > (progress_old + delay_factor):
-                    progress_old = progress
-                    
-                    # First clear the previous printout
-                    out_string = "\r" + (" " * 48) + "\r"
-                    sys.stdout.write(out_string)
-                    sys.stdout.flush()
+            # Only print when update limit is exceeded
+            if progress > (progress_old + delay_factor):
+                # Time difference from start of process to now
+                timediff = datetime.timedelta(seconds=round(time.time() \
+                                                            - existing_start))
+                
+                # Calculate the remaining seconds for tagging to finish
+                timeremain = datetime.timedelta(\
+                                                seconds=round(((time.time() - \
+                                                existing_start) / progress_count) \
+                                                * (progress_max - progress_count)))
 
-                    # Print the progress
-                    out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
-                        str(progress) + " %  [" + ("#" * bars) + (" " * spaces) + "]\r"
-                    sys.stdout.write(out_string)
-                    sys.stdout.flush()
+                progress_old = progress
+                
+                # First clear the previous printout
+                out_string = "\r" + (" " * 48) + "\r"
+                sys.stdout.write(out_string)
+                sys.stdout.flush()
+
+                # Print the progress
+                out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
+                    str(progress) + " %  |  Time: " + str(timediff) \
+                    + ' elapsed, ' + str(timeremain) + ' remaining\r'
+                sys.stdout.write(out_string)
+                sys.stdout.flush()
 
     return processed_data
 
@@ -255,9 +268,13 @@ def calculate_weights(unique_words, unique_tags, unique_data, proc_num):
 
     # Initialize progress variable
     progress_old = 0
+    progress_max = len(unique_words) * len(unique_tags)
     
     # Calculate the possible combinations
     total_combinations = len(unique_tags) * len(unique_words)
+
+    # Set inistial start time
+    existing_start = time.time()
 
     # Calculating a delay for printing the progress
     delay_factor = int(round((3 / total_combinations * 777 * (proc_num / 2)), 0))
@@ -294,26 +311,36 @@ def calculate_weights(unique_words, unique_tags, unique_data, proc_num):
             line += 1
 
         # Print progress
-        if __main__.args.progress:
-            # Calculate the progress and progress bar
-            progress = int(round(line / total_combinations * 100, 0))
-            bars = int(round(progress / 10, 0))
-            spaces = 10 - bars
+        # Calculate the progress and progress bar
+        progress = int(round(line / total_combinations * 100, 0))
+        bars = int(round(progress / 10, 0))
+        spaces = 10 - bars
 
-            # Only print when update limit is exceeded
-            if progress > (progress_old + delay_factor):
-                progress_old = progress
-                
-                # First clear the previous printout
-                out_string = "\r" + (" " * 48) + "\r"
-                sys.stdout.write(out_string)
-                sys.stdout.flush()
+        # Only print when update limit is exceeded
+        if progress > (progress_old + delay_factor):
+            # Time difference from start of process to now
+            timediff = datetime.timedelta(seconds=round(time.time() \
+                                                        - existing_start))
+            
+            # Calculate the remaining seconds for tagging to finish
+            timeremain = datetime.timedelta(\
+                                            seconds=round(((time.time() - \
+                                            existing_start) / line) \
+                                            * (progress_max - line)))
 
-                # Print the progress
-                out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
-                     str(progress) + " %  [" + ("#" * bars) + (" " * spaces) + "]\r"
-                sys.stdout.write(out_string)
-                sys.stdout.flush()
+            progress_old = progress
+            
+            # First clear the previous printout
+            out_string = "\r" + (" " * 48) + "\r"
+            sys.stdout.write(out_string)
+            sys.stdout.flush()
+
+            # Print the progress
+            out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
+                str(progress) + " %  |  Time: " + str(timediff) \
+                + ' elapsed, ' + str(timeremain) + ' remaining\r'
+            sys.stdout.write(out_string)
+            sys.stdout.flush()
 
     # Return the chunk of weights
     return weights_df
@@ -546,6 +573,9 @@ def process_new_data(new_data_df, tag_count):
     # Initialize temporary Dataframe for tagging columns
     temp_new_data = pd.DataFrame(columns=new_data_df.columns.values)
 
+    # Set inistial start time
+    existing_start = time.time()
+
     # Initialize maximum number of rows to process in test mode
     if __main__.max_lines > 1000:
         max_lines = __main__.max_lines / 100
@@ -639,26 +669,35 @@ def process_new_data(new_data_df, tag_count):
             new_tagged_df.loc[index, "TB_qual"] = 1
 
         # Print progress
-        if __main__.args.progress:
-            # Calculate progress and progress bar
-            progress = int(round(line / progress_max * 100, 0))
-            bars = int(round(progress / 10, 0))
-            spaces = 10 - bars
+        # Calculate progress and progress bar
+        progress = int(round(line / progress_max * 100, 0))
+        bars = int(round(progress / 10, 0))
+        spaces = 10 - bars
 
-            # Only print when update limit is exceeded
-            if progress > (progress_old + delay_factor):
-                progress_old = progress
-                
-                # First clear the previous printout
-                out_string = "\r" + (" " * 48) + "\r"
-                sys.stdout.write(out_string)
-                sys.stdout.flush()
+        # Only print when update limit is exceeded
+        if progress > (progress_old + delay_factor):
+            # Time difference from start of process to now
+            timediff = datetime.timedelta(seconds=round(time.time() \
+                                                        - existing_start))
+            
+            # Calculate the remaining seconds for tagging to finish
+            timeremain = datetime.timedelta(\
+                                            seconds=round(((time.time() - \
+                                            existing_start) / line) \
+                                            * (progress_max - line)))
+            progress_old = progress
+            
+            # First clear the previous printout
+            out_string = "\r" + (" " * 48) + "\r"
+            sys.stdout.write(out_string)
+            sys.stdout.flush()
 
-                # Print the progress
-                out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
-                    str(progress) + " %  [" + ("#" * bars) + (" " * spaces) + "]\r"
-                sys.stdout.write(out_string)
-                sys.stdout.flush()
+            # Print the progress
+            out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
+                str(progress) + " %  |  Time: " + str(timediff) \
+                + ' elapsed, ' + str(timeremain) + ' remaining\r'
+            sys.stdout.write(out_string)
+            sys.stdout.flush()
 
     for t in __main__.tag_cols:
         temp_new_data[t] = new_tagged_df[t]
@@ -669,3 +708,114 @@ def process_new_data(new_data_df, tag_count):
     print()
 
     return temp_new_data
+
+# Function to call for finding existing rows in a Dataframe
+def get_existing_proc(new_data, existing_data):
+    
+    from functools import reduce
+
+    df_length = len(new_data.index)
+    found_lst = []
+    not_found_lst = []
+
+    existing_start = time.time()
+    line = 0    
+
+    for index, row in new_data.iterrows():
+        # Define empty conditions list
+        comparisons = []
+        tmp_comp = []
+
+        for head in new_data.columns:
+            # If not a tag column add the comparison to conditions list
+            # In case of string comparison apply uppercase on the dataframe
+            # and the comparing string
+            check = row[head].upper()
+            comparisons.append(existing_data[head].str.upper() \
+                                == check)
+            tmp_comp.append(row[head])
+
+        # Check if all conditions are met by applying numpy.logical
+        test = existing_data.loc[np.logical_and.reduce(comparisons)]
+        
+        if len(test) > 0:
+            # print(test)
+            # found_lst.append(new_data.loc[index])
+            found_lst.append(test.iloc[0])
+        else:
+            not_found_lst.append(new_data.loc[index])
+
+        line += 1
+
+        # Time difference from start of process to now
+        timediff = datetime.timedelta(seconds=round(time.time() \
+                                                    - existing_start))
+        
+        # Calculate the remaining seconds for process to finish
+        timeremain = datetime.timedelta(\
+                                        seconds=round(((time.time() - \
+                                        existing_start) / line) \
+                                        * (df_length - line)))
+      
+        print("\r" + "Processed: " + str(line) + '  |  time: ' + str(timediff) 
+              + ' elapsed, ' + str(timeremain) 
+              + ' remaining           ', end="\r")
+
+    # Build the dataframe with existing elements from the new data
+    found_df = pd.DataFrame(found_lst, \
+                    columns=list(existing_data.columns.values))
+    # Add an edit remark, that this data is existing data
+    found_df['TB_edit'] = 'OLD'
+    # Because it is identical data an assignment quality of 100 is set
+    found_df['TB_qual'] = 100
+    
+    # Build the dataframe for not existing data to be further processed
+    not_found_df = pd.DataFrame(not_found_lst, \
+                    columns=list(new_data.columns.values))
+
+    # Return the existing and not existing data
+    return found_df, not_found_df
+
+# Function to separate existing entries from new ones
+def get_existing(new_data, existing_data):
+
+    # One process gets all data
+    if __main__.cores < 2:
+        # One process means all data for that process and one process only
+        found_df, not_found_df = get_existing_proc(new_data, existing_data)
+        
+    # multiple processes require data partitioned 
+    else:        
+        # Calculate chunk size and split Dataframe into chunks
+        chunk_size = int(len(new_data.index) / __main__.cores)
+        chunks = [new_data.iloc[i:i+chunk_size] \
+            for i in range(0, len(new_data), chunk_size)]
+
+        # Set the number of parallel processes
+        pool = mp.Pool(processes = __main__.cores)
+    
+        # Define the processing queues with function to call and data together
+        # with process number
+        pqueue = pool.starmap(get_existing_proc, zip(chunks, repeat(existing_data)))
+
+        pool.close()
+        pool.join()
+        # Iterate the Pool segments for results to build the complete results
+        for q in pqueue:
+            try:
+                found_df = pd.concat([found_df, q[0]], ignore_index=True)
+            except:
+                found_df = q[0]
+            try:
+                not_found_df = pd.concat([not_found_df, q[1]], ignore_index=True)
+            except:
+                not_found_df = q[1]
+
+    print()
+    if len(found_df) > 0:
+        print("Existing data:\t\t", len(found_df))
+    if len(not_found_df) > 0:
+        print("New data:\t\t", len(not_found_df))
+
+    # Return the existing and not existing data
+    return found_df, not_found_df

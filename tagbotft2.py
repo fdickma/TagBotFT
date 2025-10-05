@@ -14,6 +14,9 @@ import tagbotft2_data as td
 # Main routine
 if __name__ == "__main__":
 
+    # Set inistial start time
+    start_time = time.time()
+
     # Using parameter to enable Test mode for faster testing.
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -25,13 +28,8 @@ if __name__ == "__main__":
     parser.add_argument(
         '-r', '--rebuild', help='Reload learning data', action='store_true')
     parser.add_argument(
-        '-p', '--progress', help='Displays progress information', action='store_true')
-    parser.add_argument(
-        '--inifile', default='tagbotft2.ini', type=str,
+        '-i', '--inifile', default='tagbotft2.ini', type=str,
         dest='inifile', help='Different INI file')
-    parser.add_argument(
-        '--tag', default='Tag', type=str, dest='tag',
-        help='Define tag column name')
     args = parser.parse_args()
 
     # Test run limits the amounts of input data
@@ -55,10 +53,6 @@ if __name__ == "__main__":
     else:
         # Get the number of CPU cores available
         cores = os.cpu_count()
-
-    # Set database and database path
-    database_name = 'tagbotft2.sqlite'
-    check_db = os.path.isfile('./' + database_name)
 
     # Use a different INI file
     if args.inifile:
@@ -91,8 +85,28 @@ if __name__ == "__main__":
     else:
         tag_cols = args.tag
 
-    # Maximum of non-tag columns to process
-    max_cols = config.getint('Settings','max_cols')
+    # Set data sources/directories
+    init_dir = config['Settings']['init_dir']
+    input_dir = config['Settings']['input_dir']
+    output_dir = config['Settings']['output_dir']
+
+    # Retrieve home path for ~ replacement
+    from pathlib import Path
+    home = str(Path.home())
+
+    # Replace ~ and add final /
+    if len(init_dir) > 0:
+        init_dir = init_dir.replace("~", home) + "/"
+    if len(input_dir) > 0:
+        input_dir = input_dir.replace("~", home) + "/"
+    if len(output_dir) > 0:
+        output_dir = output_dir.replace("~", home) + "/"
+    initial_files = init_dir + initial_files
+    new_files = input_dir + new_files
+
+    # Set database and database path
+    database_name = init_dir + 'tagbotft2.sqlite'
+    check_db = os.path.isfile(database_name)
 
     # Initialize initial_data Dataframe
     initial_data = pd.DataFrame()
@@ -102,7 +116,7 @@ if __name__ == "__main__":
     print("TagBot for Tables")
     print()
     print("Tag columns:\t\t", tag_cols)
-
+    
     # If the database exists skip creating a new one and load from storage
     print("Checking database:\t", end="")
 
@@ -115,9 +129,14 @@ if __name__ == "__main__":
         # Read initial tagged data from file
         initial_data = td.file_read(initial_files)
 
+        # Store initial data in plain form without tag columns
+        plain_data = initial_data.copy()
+        td.save_data(plain_data, database_name, 'plain_initial_data')
+
         # Exit if not data is available
         if len(initial_data) < 1:
-            exit()
+            print("No input data found...")
+            exit(1)
 
         # Process initial data
         processed_df = tp.initial_process(initial_data, tag_cols)
@@ -129,6 +148,23 @@ if __name__ == "__main__":
     else:
         print(" found")
         processed_df = td.read_data(database_name, 'initial_data')    
+
+    #  Create the plain data table if it doesn't exist  
+    if not td.check_table(database_name, 'plain_initial_data'):
+
+        if len(initial_data) < 1:
+            # Read initial tagged data from file
+            initial_data = td.file_read(initial_files).astype(str)
+
+        plain_data = initial_data.copy()
+        td.save_data(plain_data, database_name, 'plain_initial_data')
+    else:
+        plain_data = td.read_data(database_name, 'plain_initial_data')
+
+    # Exit if the tag columns don't exist in the initial data
+    if not set(tag_cols).issubset(plain_data.columns):
+        print("Tagging columns are missing in initial data...")
+        exit(1)
 
     # Check if the data weights table already exists or 
     # rebuilding is forced
@@ -190,15 +226,27 @@ if __name__ == "__main__":
         unique_probability_df = td.read_data(database_name, 'data_unique_probabilities')
     
     unique_records = len(unique_probability_df[unique_probability_df['probability'] > 99.9])
-
-    # Read to be tagged data from file 
-    new_data = td.file_read(new_files)
     
     print("Cleaned duplicates:\t", len(tp.get_wrong_probabilities(probability_df)))                            
     print("Unique records:\t\t", unique_records)
 
+    # Read new to be tagged data from file 
+    new_data = td.file_read(new_files)
+
+    # Remove existing rows from new data, as they are already processed
+    old_data, new_data = tp.get_existing(new_data, plain_data)
+
+    # Write old data to file
+    td.write_results(old_data, output_dir + "results_old.xlsx")
+
+    # Process new data
     result_data = tp.process_new_data(new_data, len(tag_cols))
 
-    td.write_results(result_data)
+    # Write results to file
+    td.write_results(result_data, output_dir + "results_new.xlsx")
+
+    # Print the total runtime
+    print('Execution took:\t\t {} (h:min:s, wall clock time).' \
+        .format(datetime.timedelta(seconds=round(time.time() - start_time))))
 
     print()
