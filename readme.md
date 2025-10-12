@@ -26,13 +26,14 @@ TagBotFT employs all CPU cores by default. Therefore, the more cores are availab
 
 ```
 usage: python tagbotft.py [-t] [-s] [-l]
-                          [-p] [-r]
+                          [-p] [-r] [-d]
 
--t, --test      start in test mode with fewer data for faster processing 
--s, --single    use only one thread
--l, --logfile   log console output to file "tagbotft.log"
--p, --progress  show progress information
--r, --rebuild   re-process the existing data by deleting previously processed data
+-t, --test       start in test mode with fewer data for faster processing
+-s, --single     use only one thread
+-l, --logfile    log console output to file "tagbotft.log"
+-p, --progress   show progress information
+-r, --rebuild    re-process the existing data by deleting previously processed data
+-d, --duplicates remove duplicates from input data; default keeps duplicates
 
 The usual use case is to tag data based on trained/existing data first. Then a new training might be required to encompass the new data.
 ```

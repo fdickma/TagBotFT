@@ -59,14 +59,14 @@ def initial_split(split_df, proc_num, tag_cols):
     entries = []
     tags = []
     cols = []
-    datas = []
+    words = []
 
     # Create a dictionary with the columns and their corresponding values
     data_dict = {
         'entry': entries,
         'tag': tags,
         'tag_col': cols,
-        'data': datas
+        'word': words
     }
 
     # Initialize an empty Dataframe to store processed data
@@ -110,7 +110,7 @@ def initial_split(split_df, proc_num, tag_cols):
             if line > max_lines:
                 continue
 
-            # Iterate the tag counter for progress calculation
+            # Increase the tag counter for progress calculation
             progress_count += 1
 
             # Process all columns except the tagging column
@@ -144,7 +144,7 @@ def initial_split(split_df, proc_num, tag_cols):
                         'entry': index,
                         'tag': temp_tags,
                         'tag_col': temp_tag_col,
-                        'data': temp_strings
+                        'word': temp_strings
                     }
                     temp_df = pd.DataFrame(temp_data)
                     
@@ -178,27 +178,28 @@ def initial_split(split_df, proc_num, tag_cols):
 
                 # Print the progress
                 out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
-                    str(progress) + " %  |  Time: " + str(timediff) \
+                    str(progress) + " %  |  time: " + str(timediff) \
                     + ' elapsed, ' + str(timeremain) + ' remaining\r'
                 sys.stdout.write(out_string)
                 sys.stdout.flush()
 
     return processed_data
 
+# Initial data is being split into single words in a separate table 
 def initial_process(initial_data, tag_cols=None):
     
     # Create data for the processing DataFrame
     entries = []
     tags = []
     cols = []
-    datas = []
+    words = []
 
     # Create a dictionary with the columns and their corresponding values
     data_dict = {
         'entry': entries,
         'tag': tags,
         'tag_col': cols,
-        'data': datas
+        'word': words
     }
 
     # Initialize an empty Dataframe to store processed data
@@ -337,12 +338,53 @@ def calculate_weights(unique_words, unique_tags, unique_data, proc_num):
 
             # Print the progress
             out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
-                str(progress) + " %  |  Time: " + str(timediff) \
+                str(progress) + " %  |  time: " + str(timediff) \
                 + ' elapsed, ' + str(timeremain) + ' remaining\r'
             sys.stdout.write(out_string)
             sys.stdout.flush()
 
     # Return the chunk of weights
+    return weights_df
+
+# Process initial data with DataFrame much faster than iterating rows
+# However, it delivers slightly different substrings
+def initial_process_fast(plain_data):
+
+    # List of data column names, exlude tag columns
+    data_cols = plain_data.columns.tolist()
+    only_data_cols = [x for x in data_cols if x not in __main__.tag_cols]
+
+    # Initialize DataFrame 
+    init_df = pd.DataFrame()
+
+    # Combine all data columns to one column with a space separator
+    init_df["word"] = plain_data[only_data_cols].agg(' '.join, axis=1)
+    
+    # Initialize tagging columns in the DataFrame
+    for col in __main__.tag_cols:
+        init_df[col] = plain_data[col]
+    
+    # Add the entry ID
+    init_df['entry'] = init_df.index
+    
+    # Split the words in the word column by the seperator symbols
+    init_df['word'] = init_df['word'].str.split(r'[ ,;:]+')
+    
+    # Explode the words into one line per word and lower case for all characters
+    init_df = init_df.explode('word')
+    init_df['word'] = init_df['word'].str.lower()
+
+    # Change the tags and tag column names from rows to standard columns
+    init_df = init_df.melt(id_vars=["entry","word"],var_name="tag_col",
+                value_name="tag").sort_values(['word']).reset_index(drop=True)
+    return init_df
+
+# Generate weights by counting occurrences of word/tag combinations
+# Faster version
+def generate_weights_fast(unique_data):
+    weights_df = unique_data.groupby(by=["tag","tag_col","word"], \
+        as_index=False)["entry"].count()
+    weights_df = weights_df.rename(columns={"entry": "count"})
     return weights_df
 
 # Generate weights by counting occurrences of word/tag combinations
@@ -365,7 +407,7 @@ def generate_weights(unique_data):
 
     copy_unique = unique_data[['tag', 'tag_col']].copy()
     unique_tags = copy_unique[['tag', 'tag_col']].drop_duplicates()
-    unique_words = unique_data['data'].unique()
+    unique_words = unique_data['word'].unique()
     weights_df = pd.DataFrame(count_dict)
 
     # Building test data, the data to tagged
@@ -418,6 +460,13 @@ def generate_probabilities(weights_df):
     # Identify all rows with words that occur at least twice
     duplicated_df = weights_df[weights_df[['word']].duplicated() == True]
 
+    # Initialize progress variables
+    max_lines = len(duplicated_df)
+    line = 0
+
+    # Set inistial start time
+    existing_start = time.time()
+
     # Iterate over all words
     for word in duplicated_df['word'].unique():
 
@@ -447,6 +496,26 @@ def generate_probabilities(weights_df):
                 probability_df.at[single_df[single_df['tag'] == temp_tag].index[0], 
                         'probability'] = temp_prob
     
+        # Increase counter
+        line += 1
+
+        # Time difference from start of process to now
+        timediff = datetime.timedelta(seconds=round(time.time() \
+                                                        - existing_start))
+            
+        # Calculate the remaining seconds for tagging to finish
+        timeremain = datetime.timedelta(seconds=round(((time.time() - \
+                                        existing_start) / line) \
+                                        * (max_lines - line)))
+
+        # Print the progress
+        progress = int(round(line / max_lines * 100, 0))
+        out_string = "\rProgress: " + \
+            str(progress) + " %  |  time: " + str(timediff) \
+            + ' elapsed, ' + str(timeremain) + ' remaining\r'
+        sys.stdout.write(out_string)
+        sys.stdout.flush()
+
     # Return the Dataframe with the probabilities
     return probability_df
 
@@ -620,7 +689,7 @@ def process_new_data(new_data_df, tag_count):
                 new_line = new_line + " " + str(new_item)
 
         # Split the row into a list of words like in the training data
-        list_words = re.split(r'[ ,;:.]+', str(new_line).lower())
+        list_words = re.split(r'[ ,;:]+', str(new_line).lower())
 
         # Check if trained unique words are in the list of words
         filtered_df = __main__.unique_probability_df[\
@@ -694,7 +763,7 @@ def process_new_data(new_data_df, tag_count):
 
             # Print the progress
             out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
-                str(progress) + " %  |  Time: " + str(timediff) \
+                str(progress) + " %  |  time: " + str(timediff) \
                 + ' elapsed, ' + str(timeremain) + ' remaining\r'
             sys.stdout.write(out_string)
             sys.stdout.flush()
@@ -819,3 +888,4 @@ def get_existing(new_data, existing_data):
 
     # Return the existing and not existing data
     return found_df, not_found_df
+

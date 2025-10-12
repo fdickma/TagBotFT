@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import sys
 import time
 import pandas as pd
@@ -8,6 +9,26 @@ import glob
 from sqlalchemy import create_engine
 from sqlalchemy import create_engine, MetaData
 import __main__
+
+# Function to handle exclude data
+def get_exclude():
+    if __main__.exclude_file:
+        # Read exclude file into DataFrame
+        excludes = pd.read_csv(__main__.exclude_file, delimiter=';', dtype=str)
+
+        # Replace NaN values with empty strings
+        excludes = excludes.replace(np.nan, '')
+
+        # Define the whole DataFrame as string
+        excludes = excludes.astype(str)
+
+        # Change complete Dataframe to uppercase
+        excludes = excludes.apply(lambda x: x.astype(str).str.upper())
+    else:
+        # Leave everything empty otherwise
+        excludes = []
+
+    return excludes
 
 # Function to save data to a database in a certain table
 def save_data(to_store, database_name, table_name):
@@ -76,17 +97,41 @@ def file_read(file_path):
 
             if len(read_df) > 0:
                 try:
-                    file_data = pd.concat([read_df, q], ignore_index=True)
+                    file_data = pd.concat([read_df, file_data], ignore_index=True)
                 except:
                     file_data = read_df
 
         except FileNotFoundError:
             print('File ' + f + ' not found.')
-    
+
+    print("Total records:\t\t", len(file_data))
+
+    # Remove rows based on exclude data; read exclude DataFrame first
+    excludes = get_exclude()
+
+    # Iterate over exclude columns
+    for e_col in excludes.columns:
+
+        # Proceed if the column exists 
+        if e_col in file_data.columns:
+
+            # Iterate over the rows of an exclude column
+            for i, e_str in excludes.iterrows():
+
+                # Skip empty entries
+                if len(e_str[e_col]) > 0:
+                    file_data = file_data[file_data[e_col]\
+                        .str.contains(e_str[e_col])==False]
+
+    # Remove TagBotFT columns from input data
     try:
         file_data = file_data.drop(columns=['TB_edit', 'TB_qual'])
     except:
         file_data = file_data
+
+    # Remove duplicates from input data if parameter is set
+    if __main__.args.duplicates == True:
+        file_data = file_data.drop_duplicates(keep='first')
         
     print("Input records:\t\t", len(file_data))
     return file_data.astype(str)

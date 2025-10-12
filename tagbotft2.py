@@ -28,6 +28,9 @@ if __name__ == "__main__":
     parser.add_argument(
         '-r', '--rebuild', help='Reload learning data', action='store_true')
     parser.add_argument(
+        '-d', '--duplicates', help='Remove duplicates in input data', \
+            action='store_true')
+    parser.add_argument(
         '-i', '--inifile', default='tagbotft2.ini', type=str,
         dest='inifile', help='Different INI file')
     args = parser.parse_args()
@@ -131,6 +134,12 @@ if __name__ == "__main__":
 
         # Store initial data in plain form without tag columns
         plain_data = initial_data.copy()
+
+        # Remove duplicates
+        plain_data = plain_data.drop_duplicates(keep='first')
+        print("Unique records:\t\t", len(plain_data))
+
+        # Store into database
         td.save_data(plain_data, database_name, 'plain_initial_data')
 
         # Exit if not data is available
@@ -139,7 +148,8 @@ if __name__ == "__main__":
             exit(1)
 
         # Process initial data
-        processed_df = tp.initial_process(initial_data, tag_cols)
+        #processed_df = tp.initial_process(initial_data, tag_cols)
+        processed_df = tp.initial_process_fast(plain_data)
 
         # Save the initial tagged data to database
         td.save_data(processed_df, database_name, 'initial_data')
@@ -179,13 +189,14 @@ if __name__ == "__main__":
         td.save_data(data_col_names, database_name, 'data_column_names')
     else:
         data_col_names = td.read_data(database_name, 'data_column_names')
-        
+    
     # Check if the data weights table already exists or 
     # rebuilding is forced
     if not td.check_table(database_name, 'data_weights') or args.rebuild:
 
         # Calculate weights of unique words to tags
-        weights_df = tp.generate_weights(processed_df)
+        # weights_df = tp.generate_weights(processed_df)
+        weights_df = tp.generate_weights_fast(processed_df)
 
         # Save the weights to database
         td.save_data(weights_df, database_name, 'data_weights')
