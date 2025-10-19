@@ -101,8 +101,6 @@ def calculate_weights(unique_words, unique_tags, unique_data, proc_num):
         # Print progress
         # Calculate the progress and progress bar
         progress = int(round(line / total_combinations * 100, 0))
-        bars = int(round(progress / 10, 0))
-        spaces = 10 - bars
 
         # Only print when update limit is exceeded
         if progress > (progress_old + delay_factor):
@@ -254,6 +252,8 @@ def chunk_list(data_list, chunks):
 
 # Initial data is being split into single words in a separate table
 def generate_probabilities(weights_df):
+
+    print("Generating probabilities...")
 
     # Make sure not to work on the original weights Dataframe
     probability_df = weights_df.copy()
@@ -420,6 +420,8 @@ def get_most_similar(word_list, tag_count):
 # Process Dataframe with new data
 def process_new_data(new_data_df, tag_count):
     
+    print("Tagging new data...")
+
     # Initialize line number
     line = 0
 
@@ -531,8 +533,6 @@ def process_new_data(new_data_df, tag_count):
         # Print progress
         # Calculate progress and progress bar
         progress = int(round(line / progress_max * 100, 0))
-        bars = int(round(progress / 10, 0))
-        spaces = 10 - bars
 
         # Only print when update limit is exceeded
         if progress > (progress_old + delay_factor):
@@ -617,8 +617,12 @@ def get_existing_proc(new_data, existing_data):
                                         existing_start) / line) \
                                         * (df_length - line)))
       
-        print("\r" + "Processed: " + str(line) + '  |  time: ' + str(timediff) 
-              + ' elapsed, ' + str(timeremain) 
+        # Print progress
+        # Calculate progress and progress bar
+        progress = int(round(line / df_length * 100, 0))
+
+        print("\r" + "Progress: " + str(progress) + ' %  |  time: '
+              + str(timediff) + ' elapsed, ' + str(timeremain) 
               + ' remaining           ', end="\r")
 
     # Build the dataframe with existing elements from the new data
@@ -638,6 +642,8 @@ def get_existing_proc(new_data, existing_data):
 
 # Function to separate existing entries from new ones
 def get_existing(new_data, existing_data):
+
+    print("Finding existing data...")
 
     # One process gets all data
     if __main__.cores < 2:
