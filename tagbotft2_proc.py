@@ -23,225 +23,12 @@ def is_valid_number(value):
     # Return True of False  
     return bool(pattern.fullmatch(value))
 
-def split_string(input_string):
-    # Handle float numbers first
-    if is_valid_number(input_string):
-        words = [input_string]
-    else:
-        # Split the string using the specified delimiters
-        words = re.split(r'[ ,;:.]+', str(input_string))
-    # Return the words from splitting
-    return words
-
 # Check if string is a number
 def is_valid_number(value):
     # Pattern for decimals or formatted numbers, including signed numbers
     pattern = re.compile(r'^[-]?[\d,.]+')
     # Return True of False  
     return bool(pattern.fullmatch(value))
-
-def split_string(input_string):
-    # Handle float numbers first
-    if is_valid_number(input_string):
-        words = [input_string]
-    else:
-        # Split the string using the specified delimiters
-        words = re.split(r'[ ,;:.]+', str(input_string))
-    # Return the words from splitting
-    return words
-
-def initial_split(split_df, proc_num, tag_cols):
-
-    # Set the max_lines to the number of read lines from initial data
-    max_lines = len(split_df)
-
-    # Create data for the DataFrame
-    entries = []
-    tags = []
-    cols = []
-    words = []
-
-    # Create a dictionary with the columns and their corresponding values
-    data_dict = {
-        'entry': entries,
-        'tag': tags,
-        'tag_col': cols,
-        'word': words
-    }
-
-    # Initialize an empty Dataframe to store processed data
-    processed_data = pd.DataFrame(data_dict)
-   
-    # Set inistial start time
-    existing_start = time.time()
-
-    # Align the printout of the process number to equal length
-    proc_digits = 3 - len(str(proc_num))
-    proc_string = " " * proc_digits + str(proc_num)
-
-    # Exit in case no tagging columns are provided
-    if tag_cols == None:
-        return
-
-    # Initialize progress variable
-    progress_old = 0
-    progress_max = len(tag_cols) * max_lines
-    progress_count = 0
-    
-    # Calculate a delay factor for printing the progress
-    delay_factor = int(round((3 / progress_max * 777 * (proc_num / 2)), 0))
-    if delay_factor > 11:
-        delay_factor = 11
-    delay_factor = delay_factor * 0.97711
-
-    # Iterate over all given tags
-    for tag_col in tag_cols:
-
-        # Start counting with 0 lines
-        line = 0
-
-        # Iterate over each row in the DataFrame
-        for index, row in split_df.iterrows():
-
-            tag = row[tag_col]
-    
-            # Count lines until max_lines new_filesare reached
-            line += 1
-            if line > max_lines:
-                continue
-
-            # Increase the tag counter for progress calculation
-            progress_count += 1
-
-            # Process all columns except the tagging column
-            # split_strings = {}
-            for col_name in split_df.columns:
-                # Only process non-tag columns 
-                if col_name not in tag_cols:
-
-                    # Read the column data as string
-                    original_string = str(row[col_name])
-
-                    # Split the string into single words
-                    split_words = split_string(original_string)
-                    
-                    # Clear the tags 
-                    temp_tags = []
-                    temp_tag_col = []
-                    temp_strings = []
-
-                    # Iterate over the single words list and combine word with tag
-                    for word in split_words:
-                        # Use the tag as is
-                        temp_tags.append(tag)
-                        # Use the tag column as is
-                        temp_tag_col.append(tag_col)
-                        # Convert the words to lower case for easier comparison later
-                        temp_strings.append(str(word).lower())
-                                    
-                    # In the DataFrame also add the original index for clear distinction
-                    temp_data = {
-                        'entry': index,
-                        'tag': temp_tags,
-                        'tag_col': temp_tag_col,
-                        'word': temp_strings
-                    }
-                    temp_df = pd.DataFrame(temp_data)
-                    
-                    # Append the data from the initial data line to the processed DataFrame
-                    processed_data = pd.concat([processed_data, temp_df], ignore_index=True)
-
-            # Print progress
-            # Calculate progress and progress bar
-            progress = int(round(progress_count / progress_max * 100, 0))
-            bars = int(round(progress / 10, 0))
-            spaces = 10 - bars
-
-            # Only print when update limit is exceeded
-            if progress > (progress_old + delay_factor):
-                # Time difference from start of process to now
-                timediff = datetime.timedelta(seconds=round(time.time() \
-                                                            - existing_start))
-                
-                # Calculate the remaining seconds for tagging to finish
-                timeremain = datetime.timedelta(\
-                                                seconds=round(((time.time() - \
-                                                existing_start) / progress_count) \
-                                                * (progress_max - progress_count)))
-
-                progress_old = progress
-                
-                # First clear the previous printout
-                out_string = "\r" + (" " * 48) + "\r"
-                sys.stdout.write(out_string)
-                sys.stdout.flush()
-
-                # Print the progress
-                out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
-                    str(progress) + " %  |  time: " + str(timediff) \
-                    + ' elapsed, ' + str(timeremain) + ' remaining\r'
-                sys.stdout.write(out_string)
-                sys.stdout.flush()
-
-    return processed_data
-
-# Initial data is being split into single words in a separate table 
-def initial_process(initial_data, tag_cols=None):
-    
-    # Create data for the processing DataFrame
-    entries = []
-    tags = []
-    cols = []
-    words = []
-
-    # Create a dictionary with the columns and their corresponding values
-    data_dict = {
-        'entry': entries,
-        'tag': tags,
-        'tag_col': cols,
-        'word': words
-    }
-
-    # Initialize an empty Dataframe to store processed data
-    processed_data = pd.DataFrame(data_dict)
-
-    # Building test data, the data to tagged
-    # One process gets all data
-    if __main__.cores < 2:
-        # One process means all data for that process and one process only
-        processed_data = initial_split(initial_data, 1, tag_cols)
-
-    else:
-        # Chunk it in equal parts
-        chunk_size = round(len(initial_data) / __main__.cores)
-        chunks = [initial_data.iloc[i:i+chunk_size] \
-            for i in range(0, len(initial_data), chunk_size)]
-
-        # Define a list of processes form a range
-        proc_num = [*range(1, __main__.cores + 1)]
-    
-        # Run tagging as Pool parallel processes;
-        pool = mp.Pool(processes = __main__.cores)
-    
-        # Define the processing queues with function to call and data together
-        pqueue = pool.starmap(initial_split, zip(chunks, proc_num, \
-                            repeat(tag_cols)))
-        pool.close()
-        pool.join()
-    
-        # Iterate the Pool segments for results to build the complete results
-        for q in pqueue:
-            try:
-                processed_data = pd.concat([processed_data, q], ignore_index=True)
-            except:
-                processed_data = q
-
-    if tag_cols == None:
-        processed_data = processed_data.drop('tag', axis=1)
-
-    print()
-
-    return processed_data
 
 # Actually doing the counting of words/tags with one process 
 def calculate_weights(unique_words, unique_tags, unique_data, proc_num):
@@ -348,7 +135,7 @@ def calculate_weights(unique_words, unique_tags, unique_data, proc_num):
 
 # Process initial data with DataFrame much faster than iterating rows
 # However, it delivers slightly different substrings
-def initial_process_fast(plain_data):
+def initial_process(plain_data):
 
     # List of data column names, exlude tag columns
     data_cols = plain_data.columns.tolist()
@@ -377,98 +164,39 @@ def initial_process_fast(plain_data):
     # Change the tags and tag column names from rows to standard columns
     init_df = init_df.melt(id_vars=["entry","word"],var_name="tag_col",
                 value_name="tag").sort_values(['word']).reset_index(drop=True)
+    
+    # Remove rows with empty or only one character words
+    init_df = init_df.drop(init_df[init_df['word'].str.len() < 2].index)
+
     return init_df
 
 # Generate weights by counting occurrences of word/tag combinations
 # Faster version
-def generate_weights_fast(unique_data):
+def generate_weights(unique_data):
     weights_df = unique_data.groupby(by=["tag","tag_col","word"], \
         as_index=False)["entry"].count()
     weights_df = weights_df.rename(columns={"entry": "count"})
     return weights_df
 
-# Generate weights by counting occurrences of word/tag combinations
-def generate_weights(unique_data):
-    print("Generating weights:")
-
-    # Create data for the DataFrame
-    tags = []
-    cols = []
-    words = []
-    counts = []
-
-    # Create a dictionary with the columns and their corresponding values
-    count_dict = {
-        'tag': tags,
-        'tag_col': cols,
-        'word': words,
-        'count': counts
-    }
-
-    copy_unique = unique_data[['tag', 'tag_col']].copy()
-    unique_tags = copy_unique[['tag', 'tag_col']].drop_duplicates()
-    unique_words = unique_data['word'].unique()
-    weights_df = pd.DataFrame(count_dict)
-
-    # Building test data, the data to tagged
-    # One process gets all data
-    if __main__.cores < 2:
-        # One process means all data for that process and one process only
-        weights_df = calculate_weights(unique_words, unique_tags, unique_data, 1)
-
-    else:
-        # Split the list of words into equal chunks according to the number 
-        # of CPU cores available        
-        chunks = np.array_split(unique_words, __main__.cores)
-
-        # Define a list of processes form a range
-        proc_num = [*range(1, __main__.cores + 1)]
-    
-        # Run tagging as Pool parallel processes;
-        pool = mp.Pool(processes = __main__.cores)
-    
-        # Define the processing queues with function to call and data together
-        pqueue = pool.starmap(calculate_weights, zip(chunks, repeat(unique_tags), \
-                    repeat(unique_data), proc_num))
-        pool.close()
-        pool.join()
-    
-        # Iterate the Pool segments for results to build the complete results
-        for q in pqueue:
-            try:
-                weights_df = pd.concat([weights_df, q], ignore_index=True)
-            except:
-                weights_df = q
-
-    print()
-
-    # Return non-duplicate weight results
-    return weights_df.drop_duplicates() 
-
 # Calculating probabilities from weights as absolute and relative measures
 # Absolute measures in case of a 100% relation between a word and a tag,
 # relative measures in case of relations of a word to several tags. In the
 # latter case a relative probability is being calculated.
-def generate_probabilities(weights_df):
-
-    # Make sure not to work on the original weights Dataframe
-    probability_df = weights_df.copy()
-
-    # Add the probability column with a value of 100 for all rows
-    probability_df['probability'] = 100
-
-    # Identify all rows with words that occur at least twice
-    duplicated_df = weights_df[weights_df[['word']].duplicated() == True]
+def generate_probabilities_process(word_list, duplicated_df, \
+                                    probability_df, proc_num):
 
     # Initialize progress variables
-    max_lines = len(duplicated_df)
+    max_lines = len(word_list)
     line = 0
 
     # Set inistial start time
     existing_start = time.time()
 
+    # Get a copy of the probability DataFrame
+    temp_prob_df = probability_df.copy()
+
     # Iterate over all words
-    for word in duplicated_df['word'].unique():
+    for word in word_list:
 
         # Get a temporary Dataframe with all entries of the word
         single_df = duplicated_df[duplicated_df['word'] == word]
@@ -491,9 +219,9 @@ def generate_probabilities(weights_df):
                 # And calculate the relative occurrences to the total count sum
                 temp_prob = int(round(temp_val / temp_max * 100, 0))
 
-                # Change the probebilities for the rows in the probability Dataframe
+                # Change the probabilities for the rows in the probability Dataframe
                 # based on the index reference
-                probability_df.at[single_df[single_df['tag'] == temp_tag].index[0], 
+                temp_prob_df.at[single_df[single_df['tag'] == temp_tag].index[0], 
                         'probability'] = temp_prob
     
         # Increase counter
@@ -517,6 +245,69 @@ def generate_probabilities(weights_df):
         sys.stdout.flush()
 
     # Return the Dataframe with the probabilities
+    return temp_prob_df
+
+# Split a list of values into equally sized chunks
+def chunk_list(data_list, chunks):
+    for i in range(0, len(data_list), chunks):
+        yield data_list[i:i + chunks]
+
+# Initial data is being split into single words in a separate table
+def generate_probabilities(weights_df):
+
+    # Make sure not to work on the original weights Dataframe
+    probability_df = weights_df.copy()
+
+    # Add the probability column with a value of 100 for all rows
+    probability_df['probability'] = 100
+
+    # Identify all rows with words that occur at least twice
+    duplicated_df = weights_df[weights_df[['word']].duplicated() == True]
+
+    # Get a list of all unique words to be processed
+    word_list = duplicated_df['word'].unique()
+
+    # Building test data, the data to tagged
+    # One process gets all data
+    if __main__.cores < 2:
+        # One process means all data for that process and one process only
+        probability_df = generate_probabilities_process(word_list, duplicated_df,\
+                                                        probability_df, 1)
+
+    else:
+        # Chunk it in equal parts
+        chunk_size = round(len(weights_df) / __main__.cores)
+        chunks = chunk_list(word_list, chunk_size)
+
+        # Define a list of processes form a range
+        proc_num = [*range(1, __main__.cores + 1)]
+
+        # Run tagging as Pool parallel processes;
+        pool = mp.Pool(processes = __main__.cores)
+
+        # Define the processing queues with function to call and data together
+        pqueue = pool.starmap(generate_probabilities_process, \
+                            zip(chunks, repeat(duplicated_df), \
+                            repeat(probability_df), proc_num))
+        pool.close()
+        pool.join()
+
+        # Iterate the Pool segments for results to build the complete results
+        for q in pqueue:
+            try:
+                # probability_df = pd.concat([probability_df, q], ignore_index=True)
+                #print(q.loc[q['probability'] != 100])
+                
+                probability_df.loc[q['probability'] != 100, 'probability'] = \
+                    q.loc[q['probability'] != 100] 
+            except:
+                #pass
+                # probability_df = q
+                probability_df.loc[q['probability'] != 100, 'probability'] = \
+                    q.loc[q['probability'] != 100] 
+
+    print()
+
     return probability_df
 
 # Identify not unique probabilities which would lead to unclear decisions
@@ -762,7 +553,7 @@ def process_new_data(new_data_df, tag_count):
             sys.stdout.flush()
 
             # Print the progress
-            out_string = "\rProcess: " + str(proc_string) + " |  Progress: " + \
+            out_string = "\rProgress: " + \
                 str(progress) + " %  |  time: " + str(timediff) \
                 + ' elapsed, ' + str(timeremain) + ' remaining\r'
             sys.stdout.write(out_string)

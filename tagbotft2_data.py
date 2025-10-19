@@ -127,7 +127,16 @@ def file_read(file_path):
     try:
         file_data = file_data.drop(columns=['TB_edit', 'TB_qual'])
     except:
-        file_data = file_data
+        pass
+
+    try:
+        for to_skip in __main__.skip_columns:
+            file_data = file_data.drop(columns=to_skip)
+    except:
+        pass
+
+    # Replace NaN values with empty strings
+    file_data = file_data.replace(np.nan, '')
 
     # Remove duplicates from input data if parameter is set
     if __main__.args.duplicates == True:

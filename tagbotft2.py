@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     # Test run limits the amounts of input data
     if args.test:
-        max_lines = 18000
+        max_lines = 20000
         testrun = True
     # Set to 0 to read all initial data
     else:
@@ -46,8 +46,8 @@ if __name__ == "__main__":
 
     # Redirect output to files for easier debugging
     if args.logfile:
-        sys.stdout = open('tagbotft.out', 'w')
-        sys.stderr = open('tagbotft.err', 'w')
+        sys.stdout = open('tagbotft2.out', 'w')
+        sys.stderr = open('tagbotft2.err', 'w')
         
     # Set the number of CPU cores to be used
     if args.single:
@@ -61,8 +61,11 @@ if __name__ == "__main__":
     if args.inifile:
         ini_file = args.inifile
     
-    # Loading config    
-    myDir = os.path.abspath(os.path.dirname(__file__)) + '/'
+    # Loading config            
+    if args.inifile:
+        myDir=''
+    else:
+        myDir = os.path.abspath(os.path.dirname(__file__)) + '/'
     config = configparser.ConfigParser()
     config.sections()
     config.read(myDir + ini_file)
@@ -79,8 +82,6 @@ if __name__ == "__main__":
         new_files = 'input*.csv'
     
     wsheet = config['Settings']['wsheet']
-    non_relevant_tag = config['Settings']['non_relevant_tag']
-    exclude_file = config['Settings']['exclude_file']
 
     # Set the tag column name
     if config['Settings']['tag_cols']:
@@ -92,7 +93,7 @@ if __name__ == "__main__":
     init_dir = config['Settings']['init_dir']
     input_dir = config['Settings']['input_dir']
     output_dir = config['Settings']['output_dir']
-
+    
     # Retrieve home path for ~ replacement
     from pathlib import Path
     home = str(Path.home())
@@ -107,6 +108,13 @@ if __name__ == "__main__":
     initial_files = init_dir + initial_files
     new_files = input_dir + new_files
 
+    # Set excludes
+    if len(init_dir) > 0:
+        exclude_file = init_dir + config['Settings']['exclude_file']
+    else:
+        exclude_file = config['Settings']['exclude_file']
+    skip_columns = config['Settings']['skip_cols'].split(",")
+
     # Set database and database path
     database_name = init_dir + 'tagbotft2.sqlite'
     check_db = os.path.isfile(database_name)
@@ -119,6 +127,7 @@ if __name__ == "__main__":
     print("TagBot for Tables")
     print()
     print("Tag columns:\t\t", tag_cols)
+    print("Skipping columns:\t", skip_columns)
     
     # If the database exists skip creating a new one and load from storage
     print("Checking database:\t", end="")
@@ -148,8 +157,7 @@ if __name__ == "__main__":
             exit(1)
 
         # Process initial data
-        #processed_df = tp.initial_process(initial_data, tag_cols)
-        processed_df = tp.initial_process_fast(plain_data)
+        processed_df = tp.initial_process(plain_data)
 
         # Save the initial tagged data to database
         td.save_data(processed_df, database_name, 'initial_data')
@@ -169,7 +177,11 @@ if __name__ == "__main__":
         plain_data = initial_data.copy()
         td.save_data(plain_data, database_name, 'plain_initial_data')
     else:
-        plain_data = td.read_data(database_name, 'plain_initial_data')
+        try:
+            if len(plain_data) < 1:
+                plain_data = td.read_data(database_name, 'plain_initial_data')
+        except:
+            plain_data = td.read_data(database_name, 'plain_initial_data')
 
     # Exit if the tag columns don't exist in the initial data
     if not set(tag_cols).issubset(plain_data.columns):
@@ -196,7 +208,7 @@ if __name__ == "__main__":
 
         # Calculate weights of unique words to tags
         # weights_df = tp.generate_weights(processed_df)
-        weights_df = tp.generate_weights_fast(processed_df)
+        weights_df = tp.generate_weights(processed_df)
 
         # Save the weights to database
         td.save_data(weights_df, database_name, 'data_weights')
