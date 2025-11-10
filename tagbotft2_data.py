@@ -71,6 +71,7 @@ def file_read(file_path):
         return read_df
 
     # Iterate the given file list
+    file_list.sort() 
     for f in file_list:
         
         if __main__.max_lines > 0 and len(read_df) >= __main__.max_lines:

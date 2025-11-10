@@ -28,6 +28,8 @@ if __name__ == "__main__":
     parser.add_argument(
         '-r', '--rebuild', help='Reload learning data', action='store_true')
     parser.add_argument(
+        '-b', '--debug', help='Print debug info', action='store_true')
+    parser.add_argument(
         '-d', '--duplicates', help='Remove duplicates in input data', \
             action='store_true')
     parser.add_argument(
@@ -175,6 +177,7 @@ if __name__ == "__main__":
             initial_data = td.file_read(initial_files).astype(str)
 
         plain_data = initial_data.copy()
+        plain_data = plain_data.astype(str)
         td.save_data(plain_data, database_name, 'plain_initial_data')
     else:
         try:
@@ -201,7 +204,7 @@ if __name__ == "__main__":
         td.save_data(data_col_names, database_name, 'data_column_names')
     else:
         data_col_names = td.read_data(database_name, 'data_column_names')
-    
+
     # Check if the data weights table already exists or 
     # rebuilding is forced
     if not td.check_table(database_name, 'data_weights') or args.rebuild:
@@ -217,41 +220,26 @@ if __name__ == "__main__":
     else:
         weights_df = td.read_data(database_name, 'data_weights')
 
-    # Check if the data probabilities table already exists or 
-    # rebuilding is forced
-    if not td.check_table(database_name, 'data_probabilities') or args.rebuild:
-        probability_df = tp.generate_probabilities(weights_df)    
-        td.save_data(probability_df, database_name, 'data_probabilities')
-
-    # Otherwise just read the data from the database
-    else:
-        probability_df = td.read_data(database_name, 'data_probabilities')
-
-    # Check if the data probabilities table already exists or 
-    # rebuilding is forced
-    if not td.check_table(database_name, 'data_multi_probabilities') or args.rebuild:
-        multi_probability_df = probability_df[\
-                                probability_df.duplicated(subset=['word', 'tag_col']) == True]
+    # Check if the data tables alredy exist or rebuilding is forced
+    if not td.check_table(database_name, 'data_multi_probabilities') or \
+       not td.check_table(database_name, 'data_unique_probabilities') or args.rebuild:
+        unique_probability_df, multi_probability_df = tp.generate_probabilities(weights_df)    
         td.save_data(multi_probability_df, database_name, 'data_multi_probabilities')
-        
+        td.save_data(unique_probability_df, database_name, 'data_unique_probabilities')
+    
     # Otherwise just read the data from the database
     else:
         multi_probability_df = td.read_data(database_name, 'data_multi_probabilities')
-
-    # Check if the data probabilities table already exists or 
-    # rebuilding is forced
-    if not td.check_table(database_name, 'data_unique_probabilities') or args.rebuild:
-        unique_probability_df = tp.unique_probabilities(probability_df)    
-        td.save_data(unique_probability_df, database_name, 'data_unique_probabilities')
-
-    # Otherwise just read the data from the database
-    else:
         unique_probability_df = td.read_data(database_name, 'data_unique_probabilities')
-    
-    unique_records = len(unique_probability_df[unique_probability_df['probability'] > 99.9])
-    
-    print("Cleaned duplicates:\t", len(tp.get_wrong_probabilities(probability_df)))                            
+
+    unique_records = len(unique_probability_df[unique_probability_df['probability'] > 99.9])    
     print("Unique records:\t\t", unique_records)
+
+    if not td.check_table(database_name, 'data_matrix_probabilities'):
+        matrix_probability_df = tp.generate_matrix(plain_data)
+        td.save_data(matrix_probability_df, database_name, 'data_matrix_probabilities')
+    else:
+        matrix_probability_df = td.read_data(database_name, 'data_matrix_probabilities')
 
     # Read new to be tagged data from file 
     new_data = td.file_read(new_files)

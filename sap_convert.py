@@ -23,6 +23,17 @@ def message(msg_text):
     print("-"*78)
     return
 
+# Filter input dataframe by a filter dataframe
+def filter_input(in_df, filter_df):
+    # Iterate over all columns in the filter dataframe / exclude list
+    if len(filter_df) > 0:
+        for col in filter_df:
+            newData = in_df[~in_df[[col]]\
+            .isin(filter_df[col].astype(str).tolist()).any(axis=1)]
+        return newData
+    else:
+        return in_df
+        
 def convertAmount(amount: str) -> float:
     temp = amount.strip().replace('.', '').replace(',', '.')
     return float(temp) if temp[-1] != '-' else \
@@ -61,7 +72,7 @@ def maxcol(newData, work_data):
             if len(col_length.groupby(col_length)) == 1:
                 print(col_name, len(col_length.groupby(col_length)))
                 # Keep the matching rows according
-                newData = newData[newData[col_name].str.match('\w{'\
+                newData = newData[newData[col_name].str.match('\\w{'\
                         +str(col_length[0])+'}$')]
     print('Remaining input data entries:', len(newData), 'of', org_length)
     return newData
@@ -88,6 +99,7 @@ def read_SAP_1(files: str, exclude_file, work_data):
     for f in file_list:
         try:
             rf = open(f, encoding='latin-1')
+            print("Reading ", f)
         except FileNotFoundError:
             print('File ' + f + ' not found.')
         else:
@@ -97,61 +109,61 @@ def read_SAP_1(files: str, exclude_file, work_data):
             # Regular expression pattern for cost files.
             pc = re.compile(
                 r'\|\s+(\d{4})'                # Jahr.
-                 '\|(\d+\s+)'                  # Kostenstelle.
-                 '\|(\d+\s+)'                  # Kostenart.
-                 '\|[^\|]+'                    # Kostenartenbezeichn.
-                 '\|(\d{2}\.\d{2}\.\d{4})\s+'  # Buchungsdatum.
-                 '\|\s*([\d\.]+,\d{2}[\s-])'   # Wert/KWähr.
-                 '\|([^\|]+)'                  # Bezeichnung.
-                 '\|([^\|]+)'                  # Bestelltext.
-                 '\|[^\|]+'                    # Partnerobjektbezeichnung.
-                 '\|\s+'                       # Partner-Kstl.
-                 '\|(\d+|)\s+'                 # Einkaufsbeleg.
-                 '\|\d*\s*'                    # Konto Gegenbuchung.
-                 '\|([^\|]+)')               # Ref Beleg.
+                 '\\|(\\d+\\s+)'                  # Kostenstelle.
+                 '\\|(\\d+\\s+)'                  # Kostenart.
+                 '\\|[^\\|]+'                    # Kostenartenbezeichn.
+                 '\\|(\\d{2}\\.\\d{2}\\.\\d{4})\\s+'  # Buchungsdatum.
+                 '\\|\\s*([\\d\\.]+,\\d{2}[\\s-])'   # Wert/KWähr.
+                 '\\|([^\\|]+)'                  # Bezeichnung.
+                 '\\|([^\\|]+)'                  # Bestelltext.
+                 '\\|[^\\|]+'                    # Partnerobjektbezeichnung.
+                 '\\|\\s+'                       # Partner-Kstl.
+                 '\\|(\\d+|)\\s+'                 # Einkaufsbeleg.
+                 '\\|\\d*\\s*'                    # Konto Gegenbuchung.
+                 '\\|([^\\|]+)')               # Ref Beleg.
             # Regular expression pattern for asset files.
             pa = re.compile(
-                r'\|([^\|]+)'                  # Kostenst.
-                 '\|\d+\s+'                    # Finanzst.
-                 '\|\d+\s*'                    # UNr.
-                 '\|(\d{2}\.\d{2}\.(\d{4}))'   # Aktivdatum.
-                 '\|([^\|]+)'                  # Anlagenbezeichnung.
-                 '\|\s*([\d\.]+,\d{2})\s'      # AnschWert.
-                 '\|[^\|]+'                    # Währg.
-                 '\|[^\|]+'                    # Anlagenbezeichnung.
-                 '\|(\d{7})[\s\d]'             # Anlage.
-                 '\|\d+\s+\|')                 # Geldg.
+                r'\|([^\\|]+)'                  # Kostenst.
+                 '\\|\\d+\\s+'                    # Finanzst.
+                 '\\|\\d+\\s*'                    # UNr.
+                 '\\|(\\d{2}\\.\\d{2}\\.(\\d{4}))'   # Aktivdatum.
+                 '\\|([^\\|]+)'                  # Anlagenbezeichnung.
+                 '\\|\\s*([\\d\\.]+,\\d{2})\\s'      # AnschWert.
+                 '\\|[^\\|]+'                    # Währg.
+                 '\\|[^\\|]+'                    # Anlagenbezeichnung.
+                 '\\|(\\d{7})[\\s\\d]'             # Anlage.
+                 '\\|\\d+\\s+\\|')                 # Geldg.
             # Regular expression pattern for alternative asset files.
             paa = re.compile(
                 r'\|(\d{7})\s*'                # Anlage.
-                 '\|\d*\s*'                    # UNr.
-                 '\|(\d{7})\s*'                # Kostenst.
-                 '\|\d*\s*'                    # Finanzst.
-                 '\|(\d{2}\.\d{2}\.(\d{4}))'   # Aktivdatum.
-                 '\|([^\|]+)'                  # Anlagenbezeichnung.
-                 '\|\s*([\d\.]+,\d{2})\s'      # AnschWert.
-                 '\|[^\|]+'                    # Währg.
-                 '\|[^\|]+'                    # Anlagenbezeichnung.
-                 '\|\d*\s*\|')                 # Geldg.
+                 '\\|\\d*\\s*'                    # UNr.
+                 '\\|(\\d{7})\\s*'                # Kostenst.
+                 '\\|\\d*\\s*'                    # Finanzst.
+                 '\\|(\\d{2}\\.\\d{2}\\.(\\d{4}))'   # Aktivdatum.
+                 '\\|([^\\|]+)'                  # Anlagenbezeichnung.
+                 '\\|\\s*([\\d\\.]+,\\d{2})\\s*'      # AnschWert.
+                 '\\|[^\\|]+'                    # Währg.
+                 '\\|[^\\|]+'                    # Anlagenbezeichnung.
+                 '\\|\\d*\\s*\\|')                 # Geldg.
             # Regular expression pattern for small asset files.
             pg = re.compile(
-                r'\|[^\|]+'                    # Kostenst.
-                 '\|(\d+\s+)'                  # Finanzst.
-                 '\|[^\|]+'                    # Fistl-Text
-                 '\|\d+\s+'                    # Finanzpos.
-                 '\|[^\|]+'                    # Vorg. Nr.
-                 '\|(\d{2}\.\d{2}\.(\d{4}))'   # HHM-Budat
-                 '\|\s*([\d\.]+,\d{2}[\s-])'   # Zahl.Budg.
-                 '\|[^\|]+'                    # Kreditor
-                 '\|([^\|]+)'                  # Text
-                 '\|([^\|]+)'                  # Kurztext
-                 '\|([^\|]+)'                  # Bezeichg
-                 '\|(\d+\s+|\d+|\s+)'          # RefBelegnr
-                 '\|\s+\d+'                    # Pos.
-                 '\|\d+\s+'                    # Btr.art
-                 '\|[^\|]+'                    # Betragsart
-                 '\|[^\|]+'                    # Fipos-Text
-                 '\|([^\|]+)')                 # RW-Beleg
+                r'\|[^\\|]+'                    # Kostenst.
+                 '\\|(\\d+\\s+)'                  # Finanzst.
+                 '\\|[^\\|]+'                    # Fistl-Text
+                 '\\|\\d+\\s+'                    # Finanzpos.
+                 '\\|[^\\|]+'                    # Vorg. Nr.
+                 '\\|(\\d{2}\\.\\d{2}\\.(\\d{4}))'   # HHM-Budat
+                 '\\|\\s*([\\d\\.]+,\\d{2}[\\s-])'   # Zahl.Budg.
+                 '\\|[^\\|]+'                    # Kreditor
+                 '\\|([^\\|]+)'                  # Text
+                 '\\|([^\\|]+)'                  # Kurztext
+                 '\\|([^\\|]+)'                  # Bezeichg
+                 '\\|(\\d+\\s+|\\d+|\\s+)'          # RefBelegnr
+                 '\\|\\s+\\d+'                    # Pos.
+                 '\\|\\d+\\s+'                    # Btr.art
+                 '\\|[^\\|]+'                    # Betragsart
+                 '\\|[^\\|]+'                    # Fipos-Text
+                 '\\|([^\\|]+)')                 # RW-Beleg
             for line in rf:
                 totalLineCounter += 1
                 # Check for match of Kosten data file
@@ -230,7 +242,7 @@ def read_SAP_1(files: str, exclude_file, work_data):
     # Generate a dataframe from input
     df = pd.DataFrame(data=SAPinput, \
                      columns=['Art', 'Kostenstelle', \
-                     'Text', 'Kostenart', 'Betrag', 'Datum', 'Jahr', \
+                     'Beschreibung', 'Kostenart', 'Betrag', 'Datum', 'Jahr', \
                      'Referenz'])
 
     df['Datum'] = pd.to_datetime(df['Datum'], format='%d.%m.%Y')
@@ -332,9 +344,10 @@ if __name__ == '__main__':
 
     input_data = input_data.replace("~", home)
     output_dir = output_dir.replace("~", home) + "/"
+    exclude_data = input_dir + "/" + "excludes.lst" 
 
     # Read the input data into dataframe
-    convData = read_SAP_1(input_data, '', '')
+    convData = read_SAP_1(input_data, exclude_data, '')
 
     # Writing tagging results to Excel file
     writeXLS(output_dir + 'sap_result_conv.xlsx', convData)
