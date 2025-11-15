@@ -119,7 +119,7 @@ def calculate_weights(unique_words, unique_tags, unique_data, proc_num):
             progress_old = progress
             
             # First clear the previous printout
-            out_string = "\r" + (" " * 48) + "\r"
+            out_string = "\r" + (" " * 40) + "\r"
             sys.stdout.write(out_string)
             sys.stdout.flush()
 
@@ -796,7 +796,7 @@ def process_new_data(new_data_df, tag_count):
             progress_old = progress
             
             # First clear the previous printout
-            out_string = "\r" + (" " * 48) + "\r"
+            out_string = "\r" + (" " * 40) + "\r"
             sys.stdout.write(out_string)
             sys.stdout.flush()
 

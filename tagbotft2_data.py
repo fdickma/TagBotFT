@@ -191,7 +191,7 @@ def write_results(result_data, file_name):
 
     wb = Workbook()
     sheet = wb.active
-    quality_col = []
+    quality_col = ""
     
     # Insert an editable column for manual processing of the results
     # for new data
@@ -211,6 +211,7 @@ def write_results(result_data, file_name):
             result_data[col_name].astype(str).str.len().max()
         if col_name == "TB_qual" or col_name == "TB_edit":
             sheet.column_dimensions[get_column_letter(a)].width = 12
+        if col_name == "TB_qual":
             quality_col = get_column_letter(a)
         sheet.cell(row=1, column=a).value = col_name
         sheet.cell(row=1, column=a).font = Font(name='Arial', size=10)
@@ -241,9 +242,9 @@ def write_results(result_data, file_name):
                 if val > 1:
                     val = val / 100
                 
-                if val < 0.2:
+                if val <= 0.6:
                     color_row(sheet, 'A'+str(i)+':'+quality_col+str(i), red)
-                if val >= 0.2 and val < 0.9:
+                if val > 0.6 and val < 0.99:
                     color_row(sheet, 'A'+str(i)+':'+quality_col+str(i), yellow)
         i += 1
             
@@ -259,6 +260,9 @@ def write_results(result_data, file_name):
     # Fixate the top row
     c = sheet['A2']
     sheet.freeze_panes = c
+
+    # Set the zoom factor, defaults to 85%
+    sheet.sheet_view.zoomScale = 85
 
     # Don't forget to save the file
     wb.save(filename = file_name)
