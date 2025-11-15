@@ -191,13 +191,16 @@ def write_results(result_data, file_name):
 
     wb = Workbook()
     sheet = wb.active
+    quality_col = []
     
     # Insert an editable column for manual processing of the results
-    try:
-        result_data.insert(len(result_data.columns)-1,'TB_edit', \
-        ['y' for i in range(result_data.shape[0])])
-    except:
-        pass
+    # for new data
+    if file_name[-16:] == "results_new.xlsx":
+        try:
+            result_data.insert(len(result_data.columns)-1,'TB_edit', \
+            ['y' for i in range(result_data.shape[0])])
+        except:
+            pass
 
     a = 1            
     for col_name in result_data.columns:
@@ -225,22 +228,23 @@ def write_results(result_data, file_name):
             sheet.cell(row=i, column=a).value = cell_value
             sheet.cell(row=i, column=a).font = Font(name='Calibri', size=10)
             a += 1
+        
+        if len(quality_col) > 0:
+            if i > 1 and (type(sheet[quality_col+str(i)].value) == float or \
+                type(sheet[quality_col+str(i)].value) == int):
+                # Color the line until quality value with color
+                # First get the value and set the color defaults
+                red = 'efbdbd'
+                yellow = 'efeebd'
+                val = float(sheet[quality_col+str(i)].value)
 
-        if i > 1 and (type(sheet[quality_col+str(i)].value) == float or \
-            type(sheet[quality_col+str(i)].value) == int):
-            # Color the line until quality value with color
-            # First get the value and set the color defaults
-            red = 'efbdbd'
-            yellow = 'efeebd'
-            val = float(sheet[quality_col+str(i)].value)
-
-            if val > 1:
-                val = val / 100
-            
-            if val < 0.2:
-                color_row(sheet, 'A'+str(i)+':'+quality_col+str(i), red)
-            if val >= 0.2 and val < 0.9:
-                color_row(sheet, 'A'+str(i)+':'+quality_col+str(i), yellow)
+                if val > 1:
+                    val = val / 100
+                
+                if val < 0.2:
+                    color_row(sheet, 'A'+str(i)+':'+quality_col+str(i), red)
+                if val >= 0.2 and val < 0.9:
+                    color_row(sheet, 'A'+str(i)+':'+quality_col+str(i), yellow)
         i += 1
             
     # Add Autofilter
