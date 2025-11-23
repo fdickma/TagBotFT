@@ -1,26 +1,26 @@
 ### **TagBotFT - TagBot For Tables v2**
 
-New data is being tagged based on already existing data. Results are provided as a results data file in XLSX format.
+New data is being tagged based on already existing data. Results are provided as files in XLSX format.
 
 Practically, TagBotFT works like a generic data tagging automation tool for data organized in tables. Due to optimized automated tagging it hels improving data quality.
 
-Use cases can be accounting data with non-natural language like containing just nouns and/or product names, abbreviations and other product or accounting related text pieces. This kind of data cannot be processed by NLP algorithms to be categorized because it usually has no sentence structure. In addition, there are often typing errors in accounting data when using manual data entry or even optical character recognition. Therefore, the final step of processing in TagBotFT is Levenshtein distance ([https://en.wikipedia.org/wiki/Levenshtein\\\_distance](https://en.wikipedia.org/wiki/Levenshtein%5C_distance)) to get good results by similarity of strings.
+Use cases can be accounting data with non-natural language containing just nouns and/or product names, abbreviations and other product or accounting related information. This kind of data cannot be processed by NLP algorithms to be categorized because it usually has no sentence structure, and uses strings not part of natural language. In addition, there often happen to be typing errors in manually entered accounting data or when using optical character recognition (OCR). Therefore, the final step of processing in TagBotFT is Levenshtein distance ([https://en.wikipedia.org/wiki/Levenshtein\\\_distance](https://en.wikipedia.org/wiki/Levenshtein%5C_distance)) to get good results from already tagged similar data.
 
-The input data has to be organized in tables of the same columns and column order. The existing data is to be provided in XLSX file format. For new data two different import filter exist: one for SAP report TXT files with a certain column order, and one for more generic XLSX files. Further import filters can be added individually to the code. The current version uses the SAP TXT filter for all files with a TXT suffix.
+The input data has to be organized in tables of the same columns. Additional columns can be disabled in a user defined INI file. The existing data is to be provided in XLSX file format. For new data two different import filter exist: a separat script for SAP report TXT files with a certain column order, and just using XLSX files. The SAP script exports XLSX files to be used as input data.
 
-The results are split in two files: results.xlsx contains the new tagged rows while result_data_old.xlsx contains already tagged rows. This is useful in case if one usually extracts the whole data of a year on a monthly basis while adding the tagged results to the existing data file. However, due to filtering identical data out into the old data results new data with duplicates is not identified as new data to be tagged. Due to the background of TagBotFT in accounting it counts on information columns like dates for uniqueness. In the end, it is up to the user to assure the necessary input data quality.
+The results are split in two files: results.xlsx contains the new tagged rows while result_data_old.xlsx contains already in previous runs tagged rows. This is useful in case if one usually extracts the whole data of a year on a monthly basis while adding the tagged results to the existing data file. However, due to filtering identical data out into the old data results new data with duplicates is not identified as new data to be tagged. Keep in mind, it is up to the user to assure the necessary input data quality.
 
-At least one column must be defined to contain the tags. This is done in the column names and the corresponding setting in the INI file.
+At least one column must be defined to contain tags. This is defined by using column names in the respective setting in the INI file.
 
 #### Requirements
 
-All can be met by most Linux distributions like Debian 12.
+All can be met by most Linux distributions like Debian 12+.
 
 * Python 3.9+
 * Pandas 1.0+
 * Openpyxl 3.0.3+
 
-TagBotFT employs all CPU cores by default. Therefore, the more cores are available, the faster the processing speed of the main operations.
+TagBotFT employs all CPU cores by default. Therefore, the more cores are available, the faster the processing speed of some operations.
 
 #### Parameters
 
@@ -31,9 +31,10 @@ usage: python tagbotft.py [-t] [-s] [-l]
 -t, --test       start in test mode with fewer data for faster processing
 -s, --single     use only one thread
 -l, --logfile    log console output to file "tagbotft.log"
--p, --progress   show progress information
+-b, --debug      use debug information
 -r, --rebuild    re-process the existing data by deleting previously processed data
 -d, --duplicates remove duplicates from input data; default keeps duplicates
+-i, --inifile    setting a user defined INI file
 
 The usual use case is to tag data based on trained/existing data first. Then a new training might be required to encompass the new data.
 ```
