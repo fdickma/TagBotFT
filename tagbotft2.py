@@ -251,7 +251,7 @@ if __name__ == "__main__":
     td.write_results(old_data, output_dir + "results_old.xlsx")
 
     # Process new data
-    result_data = tp.process_new_data(new_data, len(tag_cols))
+    result_data = tp.process_new_data(new_data)
 
     # Write results to file
     td.write_results(result_data, output_dir + "results_new.xlsx")

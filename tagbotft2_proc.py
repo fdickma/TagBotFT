@@ -119,7 +119,7 @@ def calculate_weights(unique_words, unique_tags, unique_data, proc_num):
             progress_old = progress
             
             # First clear the previous printout
-            out_string = "\r" + (" " * 40) + "\r"
+            out_string = "\r" + (" " * 48) + "\r"
             sys.stdout.write(out_string)
             sys.stdout.flush()
 
@@ -175,27 +175,9 @@ def initial_process(plain_data):
     regex = '^[-]{0,1}[0-9.]{2,5}$'
     init_df = init_df.drop(init_df[init_df['word'].str.match(regex)].index)
 
-    # Remove words that contains only special characters
-    regex = '^["!()#\'?=$&/.%§-]{2,}$'
+    # Remove words that contain only special characters
+    regex = '^[\"!()#\'?=$&/]{2,}$'
     init_df = init_df.drop(init_df[init_df['word'].str.match(regex)].index)
-
-    # Remove long sequences of special characters
-    regex = '["!()#\'?=$&/.%§-]{2,}'
-    init_df['word'] = init_df['word'].replace(to_replace=regex, value='', regex=True)
-
-    # Remove beginning and ending characters
-    init_df['word'] = init_df['word'].str.strip('&"()#*+»«')
-    init_df['word'] = init_df['word'].str.rstrip('-.')
-    init_df['word'] = init_df['word'].str.strip()
-
-    # Remove rows with empty or only one character words after cleaning
-    init_df = init_df.drop(init_df[init_df['word'].str.len() < 2].index)
-
-    # Removing duplicate entries
-    init_df = init_df.drop_duplicates()
-
-    # Set the right data format for the word column
-    init_df['word'] = init_df['word'].astype(str)
 
     return init_df
 
@@ -226,23 +208,21 @@ def generate_probabilities(weights_df):
                     subset=['tag_col','word'], \
                     keep=False) == True].copy()
 
-    # Adding probabilities to results with multiple tags
     duplicates_df['probability'] = 0
+
     duplicates_df['temp'] = duplicates_df.groupby(['tag_col', 'word'])['count'].transform('sum')
     if len(duplicates_df['temp']) < 1:
         return
+
     duplicates_df['probability'] = round(duplicates_df['count'] / duplicates_df['temp'] * 100, 0)
+
     duplicates_df = duplicates_df.drop(['temp'], axis=1)
 
-    # The probability of unique results is 100%
     single_df = probability_df[probability_df.duplicated(\
                     subset=['tag_col','word'], \
                     keep=False) == False].copy()
-    single_df['probability'] = 100
 
-    # Set the right data format for the word column
-    duplicates_df['word'] = duplicates_df['word'].astype(str)
-    single_df['word'] = single_df['word'].astype(str)
+    single_df['probability'] = 100
 
     return single_df, duplicates_df
 
@@ -257,7 +237,7 @@ def get_wrong_probabilities(probability_df):
 def unique_probabilities(probability_df):
     return probability_df.drop_duplicates(subset=['word', 'tag_col'], keep=False)
 
-def generate_matrix(plain_data):
+def generate_matrix(plain_data  ):
 
     # First make a copy of the plain data
     plain_str_df = plain_data.copy()
@@ -306,18 +286,6 @@ def generate_matrix(plain_data):
     # Finally reset the index to make each line clearly accessible
     matrix_df = matrix_df.reset_index()
 
-    # Remove words that contains only special characters
-    regex = '^["!()#\'?=$&/*.§-]{2,}$'
-    matrix_df = matrix_df.drop(matrix_df[matrix_df['word'].str.match(regex)].index)
-
-    # Remove long sequences of special characters
-    regex = '["!()#\'?=$&/*.§-]{2,}'
-    matrix_df['word'] = matrix_df['word'].replace(to_replace=regex, value='', regex=True)
-
-    # Remove beginning and ending characters
-    matrix_df['word'] = matrix_df['word'].str.strip('"()#*&+»«')
-    matrix_df['word'] = matrix_df['word'].str.rstrip('-.')
-
     # Add the subsequent word to a separate column for each initial
     # data row
     matrix_df['next_word'] = matrix_df['word'].shift(-1)
@@ -337,28 +305,31 @@ def generate_matrix(plain_data):
 
     # Clean the matrix Dataframe from index, row columns, and short words
     matrix_prob_df = matrix_df.copy()
-    matrix_prob_df = matrix_prob_df.drop(columns=['index'])
+    matrix_prob_df = matrix_prob_df.drop(columns=['index', 'row'])
     matrix_prob_df = matrix_prob_df[matrix_prob_df['next_word'] != ""]
     matrix_prob_df = matrix_prob_df[matrix_prob_df['word'].str.len() > 1]
     matrix_prob_df = matrix_prob_df[matrix_prob_df['next_word'].str.len() > 1]
+    #matrix_prob_df = matrix_prob_df.explode(tag_cols)
 
     # Change the tags and tag column names from rows to standard columns
-    matrix_prob_df = matrix_prob_df.melt(id_vars=["word","next_word","row"], var_name="tag_col",
+    matrix_prob_df = matrix_prob_df.melt(id_vars=["word","next_word"],var_name="tag_col",
                 value_name="tag").sort_values(['word']).reset_index(drop=True)
+    print(matrix_prob_df)
 
-    # Count the unique occurrences in the row column and rename that column
-    matrix_prob_df = matrix_prob_df.groupby(by=["tag","tag_col","word", \
-        "next_word"], as_index=False)["row"].count()
-    matrix_prob_df = matrix_prob_df.rename(columns={"row": "count"})
+    # # Get a copy of initial data and extract a list of the words in use
+    # words_df = __main__.processed_df['word'].copy()
+    # words_df = words_df.drop_duplicates()
 
-    # Compute the probabilities of each unique entry
-    matrix_prob_df['temp'] = matrix_prob_df.groupby(['tag_col', 'word', 'next_word'])\
-        ['count'].transform('sum')
-    matrix_prob_df['probability'] = round(matrix_prob_df['count'] / matrix_prob_df['temp']\
-         * 100, 0)
-    matrix_prob_df = matrix_prob_df.drop(['temp','count'], axis=1)
+    # for word in words_df:
+    #     #print(word)
+    #     word_ref_df = matrix_df[matrix_df['word'] == word]
+    #     print(matrix_df[matrix_df['word'] == word])
+        #print(matrix_df[matrix_df['plain_words'] == word])
+        #if len(word_ref_df) > 0:
+            #for i, matrix_entry in word_ref_df.iterrows():
+                #matrix_df[matrix_df['row'] == matrix_entry['row']]
 
-    return matrix_prob_df
+    return matrix_df
 
 # Process a wordlist against trained data from a Dataframe
 def calculate_similarity(word_list, tag_col):
@@ -400,7 +371,11 @@ def calculate_similarity(word_list, tag_col):
                 test_rate = i / 100
                 preselect_df = test_len_df.loc[test_len_df.apply(lambda \
                     x: SequenceMatcher(\
-                    None, word, x.word).ratio() > test_rate, axis=1)]    
+                    None, word, x.word).ratio() > test_rate, axis=1)]
+        
+        #print(len(preselect_df))
+        #print("Word:", word)
+        #print(test_df)        
 
         # Iterate over the trained data from a Dataframe
         #for index, df_word in __main__.unique_probability_df[\
@@ -494,18 +469,17 @@ def get_most_similar(word_list, tag_col):
     processed_data = processed_data.sort_values(by=['probability', 'word'], \
                 ascending=False)
 
+    # Enable for debugging
+    # processed_data.to_csv("zz_"+word_list[0]+".csv")
+
     # Return the the most similar result
     processed_data = processed_data.head(1)
     return processed_data
 
 # Process Dataframe with new data
-def process_new_data(new_data_df, tag_count):
+def process_new_data(new_data_df):
     
     print("Tagging new data...")
-
-    # Test if there is any new data
-    if len(new_data_df) < 1:
-        return pd.DataFrame()
 
     # Initialize line number
     line = 0
@@ -540,15 +514,6 @@ def process_new_data(new_data_df, tag_count):
     # Align the printout of the process number to equal length
     proc_digits = 3 - len(str(proc_num))
     proc_string = " " * proc_digits + str(proc_num)
-
-    # Create a dictionary with the columns and their corresponding values
-    next_df_dict = {
-        'tag': [],
-        'tag_col': [],
-        'word': [],
-        'next_word': [],
-        'probability': []
-    }
     
     # Iterate over the Dataframe
     for index, new_row in new_data_df.iterrows():
@@ -572,30 +537,13 @@ def process_new_data(new_data_df, tag_count):
         # Split the row into a list of words like in the training data
         list_words = re.split(r'[ ,;:]+', str(new_line).lower())
 
-        # Remove beginning and ending characters 
-        cleaned_word_list = [x for x in list_words if not re.search(r'^["!()#\'?=$&/*.§-]{2,}$', x)]
-
-        # Remove long sequences of special characters
-        pattern = re.compile(r'["!()#\'?=$&/*.§-]{2,}')
-        cleaned_word_list = [pattern.sub('', string) for string in list_words]
-
-        # Remove beginning and ending characters
-        cleaned_word_list = [x.strip('"()#*&+»«') for x in cleaned_word_list]
-        cleaned_word_list = [x.rstrip('-.') for x in cleaned_word_list]
-        cleaned_word_list = [x.strip() for x in cleaned_word_list]
-        if len(cleaned_word_list) > 0:
-            delta = list(set(list_words) - set(cleaned_word_list))
-            list_words = cleaned_word_list
-            if len(delta) > 0 and __main__.args.debug:
-                print("Cleaned words:", delta)
-
         # Filter less ideal entries
         # Empty strings
         list_words = [x for x in list_words if x.strip()]
 
         # Strings with only one character 
         list_words = [x for x in list_words if len(str(x)) > 1]
-        
+
         # Financial numbers
         pattern = re.compile(r'^[-]{0,1}[0-9]{1,4}[.]{0,1}[0-9]{0,2}$')
         filtered_word_list = list(filter(lambda s: not pattern.search(s), list_words))
@@ -614,7 +562,12 @@ def process_new_data(new_data_df, tag_count):
         if len(filtered_word_list) > 0:
             list_words = filtered_word_list
 
-        # Remove words with less than 3 characters, but only if the remainder
+        # Remove words with multiple outcome from the word list
+        #multi_df = __main__.multi_probability_df[\
+        #    __main__.multi_probability_df['word'].isin(list_words) ].copy()
+        #multi_df = multi_df[multi_df['probability'] > 30]
+
+        # Remove words with less than 4 characters, but only if the remainder
         # has data left. This list is only used for testing against multi
         # result data
         multi_words = [x for x in list_words if len(x) > 2]
@@ -626,23 +579,14 @@ def process_new_data(new_data_df, tag_count):
         if len(filtered_word_list) > 0:
             multi_words = filtered_multi_list
 
-        # Initialize tag quality for current row
         tag_quality = 0
 
-        # Get the filtered number of words in the row
-        word_list_len = len(list_words)
-
-        if __main__.args.debug:
-            print("Word list:", list_words)
-
-        # For each row iterate over the tagging columns
         for tag_col in __main__.tag_cols:
 
             tags_len = 0
             filtered_len = 0
             tags_df = pd.DataFrame()
             tags_df_uni = pd.DataFrame()
-            tags_df_matrix = pd.DataFrame()
             tags_df_mult = pd.DataFrame()
             tags_df_simil = pd.DataFrame()
             tags_prob = 0
@@ -652,12 +596,10 @@ def process_new_data(new_data_df, tag_count):
                 __main__.unique_probability_df['word'].isin(list_words)].copy()
             filtered_df = filtered_df[filtered_df['tag_col'] == tag_col]
 
-            # Omit single numbers as the sole basis for tagging
             if len(filtered_df[filtered_df['word'].str.isnumeric() == True]) < 2 and \
-                len(filtered_df[filtered_df['word'].str.isnumeric() == False]) <= 1:
+                len(filtered_df[filtered_df['word'].str.isnumeric() == False]) < 1:
                 filtered_df = filtered_df[filtered_df['word'].str.isnumeric() == False]
 
-            # Only process further if there are elements to process
             if len(filtered_df) > 0:
                 filtered_df = filtered_df.sort_values(by=['probability', 'count', 'word'], \
                     ascending=False)
@@ -665,50 +607,11 @@ def process_new_data(new_data_df, tag_count):
                     subset=["tag", "tag_col"])
                 tags_df_uni = tags_df_uni.sort_values(by=['probability'], ascending=False)
 
-            # Append to the all tag columns spanning variable if unique elements
-            # have been identified 
             if len(tags_df_uni) > 0:
                 tags_df = pd.concat([tags_df, tags_df_uni], ignore_index=True)
-                if __main__.args.debug:
-                    print("Uni:", tags_df_uni)
-                    print()
-
-            # Check if trained words and subsequent words tags are in the list of words
-            # by using the matrix data
-            if len(tags_df_uni) < 1:
-                next_df = pd.DataFrame(next_df_dict)
-                filtered_df = __main__.matrix_probability_df[\
-                    __main__.matrix_probability_df['word'].isin(list_words) & \
-                    __main__.matrix_probability_df['next_word'].isin(list_words)].copy()
-                filtered_df = filtered_df[filtered_df['tag_col'] == tag_col]
-                for w in range(0, word_list_len):
-                    if w + 1 < word_list_len:
-                        for i, filter_row in filtered_df.iterrows():
-                            if (list_words[w] == filter_row['word']) & \
-                                (list_words[w + 1] == filter_row['next_word']) & \
-                                (str(list_words[w]).isnumeric() == False):
-                                next_df.loc[len(next_df)] = {
-                                        'tag': filter_row['tag'],
-                                        'tag_col': filter_row['tag_col'],
-                                        'word': filter_row['word'],
-                                        'next_word': filter_row['next_word'],
-                                        'probability': filter_row['probability']
-                                        }
-                if len(next_df) > 0:
-                    tags_df_matrix = next_df.sort_values(by=['probability'], \
-                        ascending=False)
-                    tags_df_matrix = tags_df_matrix.drop(columns=['word','next_word'])
- 
-            # Append to the all tag columns spanning variable if matrix elements
-            # have been identified 
-            if len(tags_df_matrix) > 0:
-                tags_df = pd.concat([tags_df, tags_df_matrix], ignore_index=True)
-                if __main__.args.debug:
-                    print("Matrix:", tags_df_matrix)
-                    print() 
 
             # Check if trained words with multiple tags are in the list of words
-            if len(tags_df_uni) < 1 & len(tags_df_matrix) < 1:
+            if len(tags_df_uni) < 1:
                 filtered_df = __main__.multi_probability_df[\
                     __main__.multi_probability_df['word'].isin(multi_words)].copy()
                 filtered_df = filtered_df[filtered_df['tag_col'] == tag_col]
@@ -726,14 +629,8 @@ def process_new_data(new_data_df, tag_count):
                     if len(tags_df_mult[tags_df_mult['probability'] >= 5]) > 0:
                         tags_df_mult = tags_df_mult[tags_df_mult['probability'] >= 5]
 
-            # Append to the all tag columns spanning variable if multiple elements
-            # have been identified 
             if len(tags_df_mult) > 0:
                 tags_df = pd.concat([tags_df, tags_df_mult], ignore_index=True)
-                if __main__.args.debug:
-                    print("Multi:", tags_df_mult)
-                    print()
-
             if len(tags_df) > 0:
                 tags_df = tags_df.sort_values(by=['probability'], ascending=False)
             if len(tags_df) > 0:
@@ -752,11 +649,15 @@ def process_new_data(new_data_df, tag_count):
                 
             if len(tags_df_simil) > 0:
                 tags_df = pd.concat([tags_df, tags_df_simil], ignore_index=True)
-                if __main__.args.debug:
-                    print("Similar:", tags_df_simil)
-                    print()
             if len(tags_df) > 0:
                 tags_df = tags_df.sort_values(by=['probability'], ascending=False)
+
+            # Use for debugging
+            # if "notebook" in list_words:
+            #     print("Words:", list_words)
+            #     print("Tag Col:", tag_col)
+            #     print(tags_df_uni)
+            #     print(tags_df)
 
             # In case of exactly the number of results as tag columns given,
             # it is assumed that there is an exact result
@@ -796,7 +697,7 @@ def process_new_data(new_data_df, tag_count):
             progress_old = progress
             
             # First clear the previous printout
-            out_string = "\r" + (" " * 40) + "\r"
+            out_string = "\r" + (" " * 48) + "\r"
             sys.stdout.write(out_string)
             sys.stdout.flush()
 
@@ -809,13 +710,9 @@ def process_new_data(new_data_df, tag_count):
     
     for t in __main__.tag_cols:
         temp_new_data[t] = new_tagged_df[t]
-
-    # Catch the error in case no temp data has been processed
-    try:
-        temp_new_data = temp_new_data[list(__main__.data_col_names['data_col_names'])]
-        temp_new_data["TB_qual"] = new_tagged_df["TB_qual"]
-    except:
-        pass
+   
+    temp_new_data = temp_new_data[list(__main__.data_col_names['data_col_names'])]
+    temp_new_data["TB_qual"] = new_tagged_df["TB_qual"]
 
     print()
 

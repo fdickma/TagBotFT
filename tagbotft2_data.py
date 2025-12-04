@@ -129,12 +129,12 @@ def file_read(file_path):
         file_data = file_data.drop(columns=['TB_edit', 'TB_qual'])
     except:
         pass
-
-    try:
+           
+    # Remove columns to skip
+    if len(__main__.skip_columns) > 0:
         for to_skip in __main__.skip_columns:
-            file_data = file_data.drop(columns=to_skip)
-    except:
-        pass
+            if to_skip in list(file_data.columns.values):
+                file_data = file_data.drop(columns=to_skip)
 
     # Replace NaN values with empty strings
     file_data = file_data.replace(np.nan, '')
