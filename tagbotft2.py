@@ -251,10 +251,11 @@ if __name__ == "__main__":
     td.write_results(old_data, output_dir + "results_old.xlsx")
 
     # Process new data
-    result_data = tp.process_new_data(new_data)
+    if len(new_data) > 0:
+        result_data = tp.process_new_data(new_data)
 
-    # Write results to file
-    td.write_results(result_data, output_dir + "results_new.xlsx")
+        # Write results to file
+        td.write_results(result_data, output_dir + "results_new.xlsx")
 
     # Print the total runtime
     print('Execution took:\t\t {} (h:min:s, wall clock time).' \
